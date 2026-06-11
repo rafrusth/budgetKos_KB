@@ -18,8 +18,20 @@ class SqliteHelper {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _onCreate,
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await db.execute('''
+            CREATE TABLE ai_chats (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              prompt TEXT NOT NULL,
+              response TEXT NOT NULL,
+              timestamp TEXT NOT NULL
+            )
+          ''');
+        }
+      },
     );
   }
 
@@ -50,5 +62,21 @@ class SqliteHelper {
         sort_order INTEGER NOT NULL DEFAULT 0
       )
     ''');
+    
+    await db.execute('''
+      CREATE TABLE ai_chats (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        prompt TEXT NOT NULL,
+        response TEXT NOT NULL,
+        timestamp TEXT NOT NULL
+      )
+    ''');
+  }
+
+  Future<void> clearAllData() async {
+    final db = await database;
+    await db.delete('transactions');
+    await db.delete('categories');
+    await db.delete('ai_chats');
   }
 }

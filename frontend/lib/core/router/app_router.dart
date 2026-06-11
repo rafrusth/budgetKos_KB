@@ -80,16 +80,12 @@ class AnimatedBranchContainer extends StatelessWidget {
         return AnimatedSlide(
           offset: index == currentIndex 
               ? Offset.zero 
-              : Offset(index < currentIndex ? -0.5 : 0.5, 0.0),
+              : Offset(index < currentIndex ? -1.0 : 1.0, 0.0),
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeOutCubic,
           child: IgnorePointer(
             ignoring: index != currentIndex,
-            child: AnimatedOpacity(
-              opacity: index == currentIndex ? 1.0 : 0.0,
-              duration: const Duration(milliseconds: 300),
-              child: child,
-            ),
+            child: child,
           ),
         );
       }).toList(),

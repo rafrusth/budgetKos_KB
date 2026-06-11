@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:go_router/go_router.dart' as import_router;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:fl_chart/fl_chart.dart';
+import '../../../../core/utils/toast_helper.dart';
 import '../../../transaction/presentation/bloc/transaction_bloc.dart';
 import '../../../transaction/presentation/bloc/transaction_state.dart';
 import '../../../transaction/presentation/bloc/transaction_event.dart';
@@ -686,9 +687,7 @@ class _DashboardPageState extends State<DashboardPage> {
             },
             onDismissed: (direction) {
               context.read<TransactionBloc>().add(DeleteTransaction(tx.id));
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Transaksi berhasil dihapus')),
-              );
+              ToastHelper.showSuccess(context, 'Transaksi berhasil dihapus');
             },
             child: InkWell(
               onTap: () {

@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import '../../../../core/utils/toast_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'security_page.dart';
+import 'notifications_settings_page.dart';
+import 'help_support_page.dart';
+import '../../../../core/database/sqlite_helper.dart';
+import '../../../../core/di/injection.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -116,7 +122,9 @@ class _ProfilePageState extends State<ProfilePage> {
               title: 'Pengaturan Akun',
               children: [
                 _buildListTile(theme, icon: CupertinoIcons.person, title: 'Data Pribadi', onTap: _editProfileDialog),
-                _buildListTile(theme, icon: CupertinoIcons.lock, title: 'Keamanan', onTap: () {}),
+                _buildListTile(theme, icon: CupertinoIcons.lock, title: 'Keamanan', onTap: () {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const SecurityPage()));
+                }),
               ]
             ),
             const SizedBox(height: 24),
@@ -130,10 +138,12 @@ class _ProfilePageState extends State<ProfilePage> {
                   title: 'Tema Tampilan', 
                   trailing: const Text('Sistem', style: TextStyle(color: Colors.grey)),
                   onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ubah tema lewat sistem device Anda.')));
+                    ToastHelper.showInfo(context, 'Ubah tema lewat sistem device Anda.');
                   }
                 ),
-                _buildListTile(theme, icon: CupertinoIcons.bell, title: 'Notifikasi', onTap: () {}),
+                _buildListTile(theme, icon: CupertinoIcons.bell, title: 'Notifikasi', onTap: () {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsSettingsPage()));
+                }),
               ]
             ),
             const SizedBox(height: 24),
@@ -141,9 +151,30 @@ class _ProfilePageState extends State<ProfilePage> {
               theme,
               title: 'Lainnya',
               children: [
-                _buildListTile(theme, icon: CupertinoIcons.question_circle, title: 'Bantuan & Dukungan', onTap: () {}),
+                _buildListTile(theme, icon: CupertinoIcons.question_circle, title: 'Bantuan & Dukungan', onTap: () {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpSupportPage()));
+                }),
                 _buildListTile(theme, icon: CupertinoIcons.trash, title: 'Hapus Semua Data', color: Colors.red, onTap: () {
-                  // TODO: Delete database
+                  showDialog(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('Hapus Semua Data?'),
+                      content: const Text('Tindakan ini akan menghapus seluruh data transaksi dan kategori Anda secara permanen. Anda yakin?'),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+                        TextButton(
+                          onPressed: () async {
+                            Navigator.pop(ctx);
+                            await getIt<SqliteHelper>().clearAllData();
+                            if (mounted) {
+                              ToastHelper.showSuccess(context, 'Semua data berhasil dihapus!');
+                            }
+                          },
+                          child: const Text('Hapus Permanen', style: TextStyle(color: Colors.red)),
+                        ),
+                      ],
+                    ),
+                  );
                 }),
               ]
             ),

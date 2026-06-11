@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import '../../../../core/di/injection.dart';
+import '../../data/datasources/ai_chat_local_ds.dart';
+import '../../../../core/utils/toast_helper.dart';
 
 class AIChatPage extends StatefulWidget {
   const AIChatPage({super.key});
@@ -26,8 +29,20 @@ class _AIChatPageState extends State<AIChatPage> {
   @override
   void initState() {
     super.initState();
-    // Welcome message
-    _messages.add(_Message("Halo! Aku konsultan keuangan pribadi kamu. Ada yang bisa dibantu soal budget atau ngekos hari ini?", false, isFullyTyped: true, isNew: false));
+    _loadHistory();
+  }
+
+  Future<void> _loadHistory() async {
+    final history = await getIt<AiChatLocalDataSource>().getChatHistory();
+    setState(() {
+      _messages.clear();
+      _messages.add(_Message("Halo! Aku konsultan keuangan pribadi kamu. Ada yang bisa dibantu soal budget atau ngekos hari ini?", false, isFullyTyped: true, isNew: false));
+      for (var chat in history) {
+        _messages.add(_Message(chat.prompt, true, isFullyTyped: true, isNew: false));
+        _messages.add(_Message(chat.response, false, isFullyTyped: true, isNew: false));
+      }
+    });
+    _scrollToBottom();
   }
 
   @override
@@ -62,7 +77,7 @@ class _AIChatPageState extends State<AIChatPage> {
 
     try {
       final response = await Dio().post(
-        'http://10.105.98.210:8080/api/v1/ai/chat',
+        'https://b69e46f5d5620c.lhr.life/api/v1/ai/chat',
         data: {'message': text},
       );
 
@@ -71,6 +86,9 @@ class _AIChatPageState extends State<AIChatPage> {
         setState(() {
           _messages.add(_Message(reply, false));
         });
+        await getIt<AiChatLocalDataSource>().insertChat(
+          AiChatModel(prompt: text, response: reply, timestamp: DateTime.now())
+        );
         _scrollToBottom();
       }
     } on DioException catch (e) {
@@ -96,12 +114,21 @@ class _AIChatPageState extends State<AIChatPage> {
     final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: Text('Konsultan AI', style: TextStyle(fontWeight: FontWeight.bold, color: theme.textTheme.titleLarge?.color)),
-        backgroundColor: theme.colorScheme.surface,
-        elevation: 1,
-        iconTheme: IconThemeData(color: theme.iconTheme.color),
+        title: const Text('Bud-AI', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+            onPressed: () async {
+              await getIt<AiChatLocalDataSource>().clearHistory();
+              _loadHistory();
+              ToastHelper.showSuccess(context, 'Histori obrolan dihapus');
+            },
+          )
+        ],
       ),
-      backgroundColor: theme.colorScheme.background,
       body: Column(
         children: [
           Expanded(
@@ -125,37 +152,29 @@ class _AIChatPageState extends State<AIChatPage> {
   }
 
   Widget _buildChatBubble(_Message msg, ThemeData theme) {
-    final isDarkMode = theme.brightness == Brightness.dark;
-    
-    // AI uses card color, User uses Primary color
     final bgColor = msg.isUser 
-        ? theme.colorScheme.primary 
-        : theme.cardColor;
+        ? theme.colorScheme.primary.withOpacity(0.2) 
+        : Colors.transparent;
         
-    final textColor = msg.isUser 
-        ? theme.colorScheme.onPrimary 
-        : theme.textTheme.bodyMedium?.color;
+    final textColor = Colors.white;
 
     Widget bubble = Container(
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      padding: msg.isUser 
+          ? const EdgeInsets.symmetric(horizontal: 16, vertical: 12)
+          : const EdgeInsets.only(left: 8, right: 16, top: 8, bottom: 8),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(16).copyWith(
-          bottomRight: msg.isUser ? const Radius.circular(0) : const Radius.circular(16),
-          bottomLeft: !msg.isUser ? const Radius.circular(0) : const Radius.circular(16),
+        borderRadius: BorderRadius.circular(24).copyWith(
+          bottomRight: msg.isUser ? const Radius.circular(4) : const Radius.circular(24),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(isDarkMode ? 0.2 : 0.05),
-            blurRadius: 5,
-            offset: const Offset(0, 2),
-          )
-        ],
       ),
-      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.85),
-      child: (!msg.isUser) 
-        ? (!msg.isFullyTyped
+      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.9),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          (!msg.isUser) 
+            ? (!msg.isFullyTyped
             ? _TypewriterMarkdownText(
                 text: msg.text,
                 textColor: textColor,
@@ -175,12 +194,12 @@ class _AIChatPageState extends State<AIChatPage> {
                   listBullet: TextStyle(color: textColor),
                   tableBody: TextStyle(color: textColor),
                   tableHead: TextStyle(color: textColor, fontWeight: FontWeight.bold),
-                  code: TextStyle(
-                    backgroundColor: isDarkMode ? Colors.grey[800] : Colors.grey[200],
-                    color: isDarkMode ? Colors.white : Colors.black87,
+                  code: const TextStyle(
+                    backgroundColor: Color(0xFF1E1F20),
+                    color: Colors.white,
                   ),
                   codeblockDecoration: BoxDecoration(
-                    color: isDarkMode ? Colors.grey[850] : Colors.grey[100],
+                    color: const Color(0xFF1E1F20),
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
@@ -189,11 +208,13 @@ class _AIChatPageState extends State<AIChatPage> {
             msg.text,
             style: TextStyle(
               color: textColor,
-              fontWeight: FontWeight.w500,
-              height: 1.4,
-              fontSize: 14,
+              fontWeight: FontWeight.w400,
+              height: 1.5,
+              fontSize: 15,
             ),
           ),
+        ],
+      )
     );
 
     return Align(
@@ -209,19 +230,10 @@ class _AIChatPageState extends State<AIChatPage> {
   }
 
   Widget _buildInputArea(ThemeData theme) {
-    final isDarkMode = theme.brightness == Brightness.dark;
-    
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12).copyWith(bottom: MediaQuery.of(context).padding.bottom + 12 + 90),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.05),
-            blurRadius: 15,
-            offset: const Offset(0, -5),
-          )
-        ],
+        color: theme.scaffoldBackgroundColor,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
@@ -230,17 +242,17 @@ class _AIChatPageState extends State<AIChatPage> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
-                color: isDarkMode ? Colors.grey.withOpacity(0.1) : Colors.grey.withOpacity(0.05),
-                borderRadius: BorderRadius.circular(24),
+                color: theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(30),
               ),
               child: TextField(
                 controller: _controller,
-                style: TextStyle(color: theme.textTheme.bodyMedium?.color),
+                style: const TextStyle(color: Colors.white),
                 maxLines: 4,
                 minLines: 1,
-                decoration: InputDecoration(
-                  hintText: 'Tanya saran keuangan...',
-                  hintStyle: TextStyle(color: theme.textTheme.bodyMedium?.color?.withOpacity(0.5)),
+                decoration: const InputDecoration(
+                  hintText: 'Tulis pesan di sini...',
+                  hintStyle: TextStyle(color: Colors.grey),
                   border: InputBorder.none,
                 ),
                 onSubmitted: (_) => _sendMessage(),
@@ -250,7 +262,7 @@ class _AIChatPageState extends State<AIChatPage> {
           const SizedBox(width: 8),
           Container(
             decoration: BoxDecoration(
-              color: theme.colorScheme.primary.withOpacity(0.1),
+              color: theme.colorScheme.surface,
               shape: BoxShape.circle,
             ),
             child: IconButton(
@@ -297,17 +309,7 @@ class _TypingIndicatorState extends State<_TypingIndicator> with SingleTickerPro
         margin: const EdgeInsets.symmetric(vertical: 4),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         decoration: BoxDecoration(
-          color: theme.cardColor,
-          borderRadius: BorderRadius.circular(16).copyWith(
-            bottomLeft: const Radius.circular(0),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(isDarkMode ? 0.2 : 0.05),
-              blurRadius: 5,
-              offset: const Offset(0, 2),
-            )
-          ],
+          color: Colors.transparent,
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -326,8 +328,8 @@ class _TypingIndicatorState extends State<_TypingIndicator> with SingleTickerPro
                     margin: const EdgeInsets.symmetric(horizontal: 2),
                     width: 8,
                     height: 8,
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.primary.withOpacity(0.6),
+                    decoration: const BoxDecoration(
+                      color: Colors.blueAccent,
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -389,12 +391,12 @@ class _TypewriterMarkdownTextState extends State<_TypewriterMarkdownText> {
         listBullet: TextStyle(color: widget.textColor),
         tableBody: TextStyle(color: widget.textColor),
         tableHead: TextStyle(color: widget.textColor, fontWeight: FontWeight.bold),
-        code: TextStyle(
-          backgroundColor: isDarkMode ? Colors.grey[800] : Colors.grey[200],
-          color: isDarkMode ? Colors.white : Colors.black87,
+        code: const TextStyle(
+          backgroundColor: Color(0xFF1E1F20),
+          color: Colors.white,
         ),
         codeblockDecoration: BoxDecoration(
-          color: isDarkMode ? Colors.grey[850] : Colors.grey[100],
+          color: const Color(0xFF1E1F20),
           borderRadius: BorderRadius.circular(8),
         ),
       ),

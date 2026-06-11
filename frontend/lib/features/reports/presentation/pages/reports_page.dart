@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:fl_chart/fl_chart.dart';
+import '../../../../core/utils/toast_helper.dart';
 import '../../../transaction/presentation/bloc/transaction_bloc.dart';
 import '../../../transaction/presentation/bloc/transaction_state.dart';
 import '../../../transaction/presentation/bloc/transaction_event.dart';
@@ -180,7 +181,7 @@ class _ReportsPageState extends State<ReportsPage> {
     });
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.only(left: 20, right: 20, top: 20, bottom: 120),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -513,9 +514,7 @@ class _ReportsPageState extends State<ReportsPage> {
             },
             onDismissed: (direction) {
               context.read<TransactionBloc>().add(DeleteTransaction(tx.id));
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Transaksi berhasil dihapus')),
-              );
+              ToastHelper.showSuccess(context, 'Transaksi berhasil dihapus');
             },
             child: ListTile(
               contentPadding: EdgeInsets.zero,

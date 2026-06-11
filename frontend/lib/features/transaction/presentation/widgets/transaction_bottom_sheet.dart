@@ -5,6 +5,7 @@ import '../bloc/transaction_bloc.dart';
 import '../bloc/transaction_event.dart';
 import '../bloc/transaction_state.dart';
 import '../../data/models/transaction_model.dart';
+import '../../../../core/utils/toast_helper.dart';
 
 class TransactionBottomSheet extends StatefulWidget {
   final String initialType; // 'income' or 'expense'
@@ -66,9 +67,7 @@ class _TransactionBottomSheetState extends State<TransactionBottomSheet> {
 
   void _submit() {
     if (_amountController.text.isEmpty || _selectedCategoryId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nominal dan Kategori harus diisi')),
-      );
+      ToastHelper.showError(context, 'Nominal dan Kategori harus diisi');
       return;
     }
 
