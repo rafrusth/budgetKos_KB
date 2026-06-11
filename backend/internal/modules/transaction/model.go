@@ -1,8 +1,8 @@
 package transaction
 
 import (
-	"time"
 	"budget_kos/backend/internal/modules/category"
+	"time"
 )
 
 type Transaction struct {

@@ -28,7 +28,7 @@ func (h *Handler) Chat(c *gin.Context) {
 
 	reply, err := h.service.GetAdvice(req.Message)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, "Gagal mendapatkan respon dari AI: " + err.Error())
+		response.Error(c, http.StatusInternalServerError, "Gagal mendapatkan respon dari AI: "+err.Error())
 		return
 	}
 

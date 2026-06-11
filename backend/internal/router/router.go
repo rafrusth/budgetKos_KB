@@ -20,7 +20,7 @@ func SetupRouter() *gin.Engine {
 		api.GET("/ping", func(c *gin.Context) {
 			c.JSON(200, gin.H{"message": "pong"})
 		})
-		
+
 		category.RegisterRoutes(api, database.DB)
 		transaction.RegisterRoutes(api, database.DB)
 		budget.RegisterRoutes(api, database.DB)

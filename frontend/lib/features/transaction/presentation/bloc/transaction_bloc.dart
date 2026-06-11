@@ -54,7 +54,6 @@ class TransactionBloc extends Bloc<TransactionEvent, TransactionState> {
 
   Future<void> _onAddTransaction(AddTransaction event, Emitter<TransactionState> emit) async {
     if (state is TransactionLoaded) {
-      final currentState = state as TransactionLoaded;
       try {
         final newTx = TransactionModel(
           id: 0,

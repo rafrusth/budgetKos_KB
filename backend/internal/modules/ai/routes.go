@@ -1,9 +1,9 @@
 package ai
 
 import (
+	"budget_kos/backend/internal/modules/transaction"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
-	"budget_kos/backend/internal/modules/transaction"
 )
 
 func RegisterRoutes(api *gin.RouterGroup, db *gorm.DB) {

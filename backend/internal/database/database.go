@@ -15,7 +15,7 @@ var DB *gorm.DB
 
 func ConnectDB() {
 	var err error
-	
+
 	dbFile := config.AppConfig.DBFile
 	if dbFile == "" {
 		dbFile = "budgetkos.db"

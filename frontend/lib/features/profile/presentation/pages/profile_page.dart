@@ -53,7 +53,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 _userName = nameController.text;
                 _userEmail = emailController.text;
               });
-              if (mounted) Navigator.pop(ctx);
+              if (ctx.mounted) Navigator.pop(ctx);
             },
             child: const Text('Simpan'),
           ),

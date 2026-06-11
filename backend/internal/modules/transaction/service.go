@@ -40,7 +40,7 @@ func (s *service) Update(id uint, req Transaction) (*Transaction, error) {
 	tx.CategoryID = req.CategoryID
 	tx.Notes = req.Notes
 	tx.Date = req.Date
-	
+
 	err = s.repo.Update(tx)
 	return tx, err
 }

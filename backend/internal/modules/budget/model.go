@@ -1,8 +1,8 @@
 package budget
 
 import (
-	"time"
 	"budget_kos/backend/internal/modules/category"
+	"time"
 )
 
 type Budget struct {

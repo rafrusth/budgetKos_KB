@@ -227,7 +227,7 @@ class _TransactionBottomSheetState extends State<TransactionBottomSheet> {
                           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                         ),
                       );
-                    }).toList(),
+                    }),
                     ActionChip(
                       label: const Text('+ Kategori Baru', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
                       backgroundColor: Colors.blue.withOpacity(0.1),

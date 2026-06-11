@@ -38,7 +38,7 @@ func (s *service) Update(id uint, req Budget) (*Budget, error) {
 	budget.LimitAmount = req.LimitAmount
 	budget.Month = req.Month
 	budget.Year = req.Year
-	
+
 	err = s.repo.Update(budget)
 	return budget, err
 }
