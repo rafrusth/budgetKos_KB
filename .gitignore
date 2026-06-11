@@ -11,8 +11,7 @@
 .svn/
 .swiftpm/
 migrate_working_dir/
-.env
-backend/.env
+/backend/.env
 *.log
 frontend/android/build/
 
@@ -44,6 +43,6 @@ app.*.symbols
 app.*.map.json
 
 # Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
+/frontend/android/app/debug
+/frontend/android/app/profile
+/frontend/android/app/release

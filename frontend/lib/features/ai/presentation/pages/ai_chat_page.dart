@@ -62,7 +62,7 @@ class _AIChatPageState extends State<AIChatPage> {
 
     try {
       final response = await Dio().post(
-        'http://127.0.0.1:8080/api/v1/ai/chat',
+        'http://10.105.98.210:8080/api/v1/ai/chat',
         data: {'message': text},
       );
 
