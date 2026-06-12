@@ -1,1072 +1,619 @@
-# BudgetKos AI — Implementation Plan (v2)
+# BudgetKos AI — Dokumentasi Arsitektur & Implementasi
 
-> [!NOTE]
-> **Updated** berdasarkan feedback user. Perubahan utama: arsitektur modular dengan Go backend, dual database (SQLite + Isar), onboarding lebih detail, dan notifikasi harian.
-
----
-
-## 1. Deskripsi Proyek
-
-**BudgetKos AI** adalah aplikasi mobile Android berbasis Flutter yang dirancang khusus untuk **mahasiswa kos** dalam mengelola keuangan bulanan mereka. Aplikasi ini menggabungkan pencatatan keuangan yang intuitif dengan kecerdasan buatan (Gemini AI) untuk memberikan rekomendasi pengeluaran, pengingat budget, dan analisis pola keuangan yang cerdas.
-
-### Masalah yang Dipecahkan
-- Mahasiswa kos sering kesulitan mengatur keuangan bulanan yang terbatas
-- Tidak ada pencatatan terstruktur untuk pemasukan dan pengeluaran
-- Sulit mengidentifikasi pola pengeluaran boros
-- Tidak ada sistem peringatan sebelum budget habis
-
-### Target Pengguna
-- Mahasiswa kos berusia 18–25 tahun
-- Pengguna dengan budget bulanan terbatas (Rp 1–3 juta/bulan)
-- Pengguna Android yang menginginkan solusi keuangan sederhana namun cerdas
-
-### Keputusan Desain (dari Feedback)
-| Keputusan | Pilihan |
-|-----------|---------|
-| API Key Gemini | User input sendiri via Settings |
-| Bahasa | Sepenuhnya Bahasa Indonesia |
-| Onboarding | Detail (kategori prioritas, target tabungan, manajemen keuangan) |
-| Data Backup | Export/Import CSV lokal |
-| Notifikasi Harian | Ya — pengingat catat pengeluaran (jam 21:00) |
-| Backend | Go (Golang) — modular |
-| Database | Dual: SQLite (relasional) + Isar (NoSQL) |
+> Dokumen ini merupakan **sumber kebenaran tunggal** (*single source of truth*) yang menggambarkan seluruh arsitektur, struktur kode, alur data, dan keputusan desain dari aplikasi **BudgetKos AI** sebagaimana kondisi *source code* saat ini (Juni 2026).
 
 ---
 
-## 2. Arsitektur Sistem — Modular
+## 1. Ringkasan Proyek
 
-### 2.1 High-Level Architecture
+| Aspek | Detail |
+|---|---|
+| **Nama** | BudgetKos AI |
+| **Deskripsi** | Aplikasi pencatatan keuangan pribadi untuk mahasiswa / anak kos, dilengkapi AI Consultant (Bud-AI) yang mampu menganalisis data keuangan dan **mencatatkan transaksi secara otomatis** melalui *chat*. |
+| **Target Pengguna** | Mahasiswa, anak kos, pekerja muda di Indonesia |
+| **Platform** | Android (APK) |
+| **Bahasa UI** | Bahasa Indonesia (bahasa gaul anak muda) |
+| **Repository** | `github.com/rafrusth/budgetKos_KB` |
+
+---
+
+## 2. Tech Stack
+
+### 2.1 Frontend — Flutter
+
+| Komponen | Teknologi | Versi |
+|---|---|---|
+| Framework | Flutter / Dart | SDK ≥ 3.12.1 |
+| State Management | `flutter_bloc` | 8.1.6 |
+| Routing | `go_router` | 14.6.2 |
+| DI | `get_it` + `injectable` | 7.6.4 / 2.4.0 |
+| Database Lokal | `sqflite` | 2.4.3 |
+| HTTP Client | `dio` | 5.8.0 |
+| Charts | `fl_chart` | 0.70.2 |
+| Markdown Render | `flutter_markdown` | 0.7.7+1 |
+| Koneksi Check | `connectivity_plus` | 7.1.1 |
+| Secure Storage | `flutter_secure_storage` | 9.2.2 |
+| PDF Export | `pdf` + `printing` | 3.11.1 / 5.13.1 |
+| Toast | `toastification` | 3.2.0 |
+| Calendar | `table_calendar` | 3.1.2 |
+| Fonts | `google_fonts` | 6.2.1 |
+| Animations | `flutter_animate` | 4.5.2 |
+| Notifications | `flutter_local_notifications` | 18.0.1 |
+
+### 2.2 Backend — Go (Golang)
+
+| Komponen | Teknologi | Versi |
+|---|---|---|
+| HTTP Framework | Gin Gonic | 1.12.0 |
+| ORM | GORM | 1.31.1 |
+| Database | SQLite (via `gorm.io/driver/sqlite`) | 1.6.0 |
+| Config | Viper (`.env`) | 1.21.0 |
+| CORS | `gin-contrib/cors` | 1.7.7 |
+| AI | Google Generative AI SDK (`genai`) | latest |
+| Go Version | 1.26.4 | — |
+
+### 2.3 Infrastruktur & Deployment
+
+| Komponen | Teknologi |
+|---|---|
+| Tunneling (Dev) | Cloudflared (`trycloudflare.com`) |
+| Container | Dockerfile (multi-stage: `golang:1.22-alpine` → `alpine:latest`) |
+| Exposed Port | 8081 (local) |
+
+---
+
+## 3. Arsitektur Sistem — High Level
 
 ```mermaid
 graph TB
-    subgraph Client["📱 Flutter Mobile App"]
-        UI["Presentation Layer"]
+    subgraph Android["📱 Android (Flutter)"]
+        UI["Presentation Layer (Pages, Widgets)"]
         BLoC["BLoC State Management"]
         Repo["Repository Layer"]
-        LocalDB["Local Data Sources"]
+        LocalDS["Local DataSource (sqflite)"]
+        SQLiteLocal["SQLite DB (budgetkos.db)"]
     end
 
-    subgraph Backend["🖥️ Go Backend (REST API)"]
-        Router["Gin Router"]
-        Handler["Handlers"]
-        Service["Service Layer"]
-        AIService["Gemini AI Service"]
-        DBLayer["Database Layer"]
+    subgraph Backend["🖥️ Go Backend (Gin)"]
+        Router["Router + Middleware (CORS)"]
+        Handlers["Handlers"]
+        Services["Service Layer"]
+        GormRepo["GORM Repository"]
+        SQLiteBackend["SQLite DB (budgetkos.db)"]
+        GeminiSDK["Gemini 2.5 Flash API"]
     end
 
-    subgraph Storage["💾 Backend Storage"]
-        PostgreSQL["PostgreSQL / SQLite"]
-    end
-
-    subgraph AI["🤖 External API"]
-        Gemini["Google Gemini API"]
+    subgraph Tunnel["🌐 Cloudflared Tunnel"]
+        CF["trycloudflare.com URL"]
     end
 
     UI --> BLoC
     BLoC --> Repo
-    Repo -->|REST API| Router
-    Repo --> LocalDB
-    Router --> Handler
-    Handler --> Service
-    Service --> AIService
-    Service --> DBLayer
-    AIService --> Gemini
-    DBLayer --> PostgreSQL
+    Repo --> LocalDS
+    LocalDS --> SQLiteLocal
+
+    UI -- "POST /api/v1/ai/chat\n(with local_context)" --> CF
+    CF --> Router
+    Router --> Handlers
+    Handlers --> Services
+    Services --> GormRepo
+    GormRepo --> SQLiteBackend
+    Services -- "GenerateContent()" --> GeminiSDK
+    GeminiSDK -- "Structured JSON Response" --> Services
+    Services -- "Auto-create transactions" --> GormRepo
 ```
 
-### 2.2 Komunikasi Client-Server
+### Poin Penting Arsitektur
 
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant F as Flutter App
-    participant L as Local DB (SQLite/Isar)
-    participant B as Go Backend
-    participant G as Gemini API
-
-    U->>F: Tambah Transaksi
-    F->>L: Simpan ke SQLite (offline-first)
-    F->>B: POST /api/v1/transactions (sync)
-    B-->>F: 201 Created
-
-    U->>F: Minta Analisis AI
-    F->>L: Query data transaksi
-    F->>B: POST /api/v1/ai/analyze
-    B->>G: Send prompt + context
-    G-->>B: AI Response
-    B-->>F: Formatted analysis
-    F->>L: Cache response di Isar
-```
-
-### 2.3 Offline-First Strategy
-- **Semua data transaksi** disimpan di SQLite lokal terlebih dahulu
-- Sync ke backend saat koneksi tersedia
-- **Dashboard cache & AI responses** disimpan di Isar untuk akses cepat
-- Conflict resolution: **last-write-wins** dengan timestamp
+1. **Offline-First**: Seluruh data transaksi, kategori, dan riwayat chat disimpan di **SQLite lokal HP** (`sqflite`). Aplikasi berfungsi penuh tanpa internet kecuali fitur AI Chat.
+2. **Context Injection**: Saat user mengirim pesan ke AI, Flutter mengumpulkan **seluruh data transaksi lokal** (total income, total expense, 50 transaksi terakhir) dan mengirimnya sebagai `local_context` dalam body request HTTP. Backend **tidak** membaca database backend-nya sendiri untuk konteks user.
+3. **AI Automation**: Gemini merespons dalam format **Structured JSON** (`application/json`). Jika ada transaksi yang perlu dibuat, backend langsung meng-*execute* `txService.Create()` dan mengembalikan record lengkap ke Flutter, yang kemudian juga menyimpannya ke SQLite lokal.
 
 ---
 
-## 3. Tech Stack
+## 4. Struktur Direktori
 
-### 3.1 Frontend — Flutter
-
-| Komponen | Teknologi | Alasan |
-|----------|-----------|--------|
-| Framework | **Flutter 3.x** | Cross-platform, performa native, rich UI widgets |
-| Bahasa | **Dart 3.x** | Null safety, async/await, strong typing |
-| Min SDK | Android API 24 (Android 7.0) | Cakupan 95%+ perangkat Android aktif |
-| State Management | **flutter_bloc** | Predictable state, testable, scalable |
-| Architecture | **Clean Architecture** | Separation of concerns, maintainability |
-| DI | **get_it + injectable** | Service locator pattern, auto-registration |
-| Routing | **go_router** | Declarative routing, deep linking support |
-| HTTP Client | **dio** | Interceptors, retry logic, error handling |
-| Charts | **fl_chart** | Pie, bar, line chart yang customizable |
-| Animations | **flutter_animate** | Micro-animations, staggered effects |
-| Calendar | **table_calendar** | Calendar view untuk tracking harian |
-| Fonts | **Google Fonts** (Poppins, Inter) | Typography modern dan clean |
-| Notifications | **flutter_local_notifications** | Pengingat budget, bill reminder |
-| Currency Format | **intl** | Format Rupiah (IDR), locale Indonesia |
-| PDF Export | **pdf** + **printing** | Export laporan keuangan |
-
-### 3.2 Frontend — Database (Dual Architecture)
-
-| Database | Teknologi | Use Case |
-|----------|-----------|----------|
-| **SQL (Relational)** | **sqflite** | Transaksi, kategori, budgets, reminders — data yang butuh relational queries, JOIN, aggregasi |
-| **NoSQL (Document)** | **isar** | Dashboard cache, user settings, AI chat history, achievement state, onboarding state — data yang butuh fast read, flexible schema |
-| **Secure Storage** | **flutter_secure_storage** | Gemini API key, auth tokens |
-| **Key-Value** | **shared_preferences** | Theme preference, first launch flag |
-
-#### Pembagian Data antar Database
-
-```mermaid
-graph LR
-    subgraph SQLite["🗄️ SQLite (Relasional)"]
-        T["transactions"]
-        C["categories"]
-        B["budgets"]
-        R["reminders"]
-    end
-
-    subgraph Isar["📦 Isar (NoSQL)"]
-        UP["userProfile"]
-        DC["dashboardCache"]
-        AI["aiChatHistory"]
-        ACH["achievements"]
-        AS["appSettings"]
-        OB["onboardingData"]
-    end
-
-    subgraph Secure["🔒 Secure Storage"]
-        AK["geminiApiKey"]
-    end
-```
-
-**Alasan Pembagian:**
-- **SQLite** untuk data yang membutuhkan query kompleks (SUM, GROUP BY, JOIN antar tabel) → transaksi keuangan, budget per kategori
-- **Isar** untuk data yang membutuhkan fast read, flexible schema, dan tidak butuh relasi kompleks → cache dashboard, settings, chat history
-
-### 3.3 Backend — Go (Golang)
-
-| Komponen | Teknologi | Alasan |
-|----------|-----------|--------|
-| Bahasa | **Go 1.22+** | Performa tinggi, concurrency, low memory footprint |
-| Web Framework | **Gin** | Ringan, cepat, middleware support |
-| ORM | **GORM** | Migrasi otomatis, query builder |
-| Database | **SQLite** (dev) / **PostgreSQL** (prod-ready) | Relational, ACID compliant |
-| AI Client | **google/generative-ai-go** | Official Gemini SDK untuk Go |
-| Config | **viper** | Environment variables, config files |
-| Logger | **zap** | Structured logging, high performance |
-| Validation | **go-playground/validator** | Input validation |
-| Migration | **golang-migrate** | Database versioning |
-| API Docs | **swaggo/swag** | Auto-generate Swagger/OpenAPI |
-
----
-
-## 4. Struktur Proyek — Modular
-
-### 4.1 Backend (Go) — Modular Monolith
+### 4.1 Backend (`backend/`)
 
 ```
 backend/
+├── .env                          # Konfigurasi (PORT, DB_FILE, GEMINI_API_KEY)
+├── Dockerfile                    # Multi-stage build
 ├── cmd/
 │   └── server/
-│       └── main.go                    # Entry point
+│       └── main.go               # Entry point
 ├── internal/
 │   ├── config/
-│   │   └── config.go                  # App configuration (viper)
-│   ├── middleware/
-│   │   ├── cors.go                    # CORS middleware
-│   │   ├── logger.go                  # Request logging
-│   │   └── ratelimit.go              # Rate limiting
-│   ├── modules/
-│   │   ├── transaction/               # 📝 Module: Transaksi
-│   │   │   ├── handler.go            # HTTP handlers
-│   │   │   ├── service.go            # Business logic
-│   │   │   ├── repository.go         # DB queries
-│   │   │   ├── model.go              # Data models
-│   │   │   ├── dto.go                # Request/Response DTOs
-│   │   │   └── routes.go             # Route registration
-│   │   ├── category/                  # 🏷️ Module: Kategori
-│   │   │   ├── handler.go
-│   │   │   ├── service.go
-│   │   │   ├── repository.go
-│   │   │   ├── model.go
-│   │   │   ├── dto.go
-│   │   │   └── routes.go
-│   │   ├── budget/                    # 💰 Module: Budget
-│   │   │   ├── handler.go
-│   │   │   ├── service.go
-│   │   │   ├── repository.go
-│   │   │   ├── model.go
-│   │   │   ├── dto.go
-│   │   │   └── routes.go
-│   │   ├── reminder/                  # ⏰ Module: Reminder
-│   │   │   ├── handler.go
-│   │   │   ├── service.go
-│   │   │   ├── repository.go
-│   │   │   ├── model.go
-│   │   │   ├── dto.go
-│   │   │   └── routes.go
-│   │   ├── ai/                        # 🤖 Module: AI Advisor
-│   │   │   ├── handler.go
-│   │   │   ├── service.go            # Gemini integration
-│   │   │   ├── prompt.go             # Prompt templates
-│   │   │   ├── dto.go
-│   │   │   └── routes.go
-│   │   ├── report/                    # 📊 Module: Laporan
-│   │   │   ├── handler.go
-│   │   │   ├── service.go
-│   │   │   ├── dto.go
-│   │   │   └── routes.go
-│   │   ├── gamification/              # 🏆 Module: Gamification
-│   │   │   ├── handler.go
-│   │   │   ├── service.go
-│   │   │   ├── repository.go
-│   │   │   ├── model.go
-│   │   │   └── routes.go
-│   │   └── user/                      # 👤 Module: User Profile
-│   │       ├── handler.go
-│   │       ├── service.go
-│   │       ├── repository.go
-│   │       ├── model.go
-│   │       ├── dto.go
-│   │       └── routes.go
+│   │   └── config.go             # Viper config loader
 │   ├── database/
-│   │   ├── database.go               # DB connection & initialization
-│   │   └── migrations/               # SQL migration files
-│   └── router/
-│       └── router.go                  # Route aggregator
-├── pkg/
-│   ├── response/                      # Standard API response format
-│   │   └── response.go
-│   ├── validator/                     # Custom validators
-│   │   └── validator.go
-│   └── utils/                         # Shared utilities
-│       ├── currency.go
-│       └── time.go
-├── go.mod
-├── go.sum
-├── .env.example
-└── Makefile
+│   │   └── database.go           # GORM connection + AutoMigrate
+│   ├── middleware/
+│   │   └── cors.go               # CORS middleware
+│   ├── router/
+│   │   └── router.go             # Route registration
+│   └── modules/
+│       ├── ai/
+│       │   ├── handler.go        # ChatRequest + LocalContext struct
+│       │   ├── service.go        # Gemini integration + automation
+│       │   └── routes.go         # POST /ai/chat
+│       ├── category/
+│       │   ├── model.go          # Category GORM model
+│       │   ├── repository.go     # CRUD repository
+│       │   ├── service.go        # Business logic
+│       │   ├── handler.go        # HTTP handlers
+│       │   └── routes.go         # CRUD routes
+│       ├── transaction/
+│       │   ├── model.go          # Transaction GORM model
+│       │   ├── repository.go     # CRUD repository
+│       │   ├── service.go        # Business logic
+│       │   ├── handler.go        # HTTP handlers
+│       │   └── routes.go         # CRUD routes
+│       ├── budget/
+│       │   ├── model.go          # Budget GORM model
+│       │   ├── repository.go     # CRUD repository
+│       │   ├── service.go        # Business logic
+│       │   ├── handler.go        # HTTP handlers
+│       │   └── routes.go         # CRUD routes
+│       ├── gamification/         # (Empty — belum diimplementasi)
+│       ├── reminder/             # (Empty — belum diimplementasi)
+│       ├── report/               # (Empty — belum diimplementasi)
+│       └── user/                 # (Empty — belum diimplementasi)
+└── pkg/
+    └── response/
+        └── response.go           # Standardized JSON response helper
 ```
 
-### 4.2 Frontend (Flutter) — Feature-based Modular
+### 4.2 Frontend (`frontend/lib/`)
 
 ```
-frontend/
-├── lib/
-│   ├── app.dart                          # MaterialApp root
-│   ├── main.dart                         # Entry point
-│   ├── core/
-│   │   ├── constants/
-│   │   │   ├── api_constants.dart        # Base URL, endpoints
-│   │   │   ├── app_constants.dart        # App-wide constants
-│   │   │   └── db_constants.dart         # Table names, collection names
-│   │   ├── errors/
-│   │   │   ├── failures.dart             # Failure classes
-│   │   │   └── exceptions.dart           # Exception classes
-│   │   ├── network/
-│   │   │   ├── api_client.dart           # Dio client setup
-│   │   │   ├── api_interceptor.dart      # Auth, logging interceptors
-│   │   │   └── network_info.dart         # Connectivity checker
-│   │   ├── database/
-│   │   │   ├── sqlite_helper.dart        # SQLite initialization & migrations
-│   │   │   └── isar_helper.dart          # Isar initialization
-│   │   ├── theme/
-│   │   │   ├── app_theme.dart            # ThemeData (light & dark)
-│   │   │   ├── app_colors.dart           # Color palette
-│   │   │   ├── app_typography.dart       # Text styles
-│   │   │   └── app_decorations.dart      # Box decorations, gradients
-│   │   ├── utils/
-│   │   │   ├── currency_formatter.dart   # Rp formatting
-│   │   │   ├── date_formatter.dart       # Tanggal Indonesia
-│   │   │   ├── greeting_helper.dart      # Selamat pagi/siang/malam
-│   │   │   └── validators.dart           # Input validation
-│   │   ├── di/
-│   │   │   └── injection.dart            # GetIt + Injectable setup
-│   │   └── router/
-│   │       └── app_router.dart           # GoRouter config
-│   │
-│   ├── features/
-│   │   ├── splash/
-│   │   │   └── presentation/
-│   │   │       └── pages/
-│   │   │           └── splash_page.dart
-│   │   │
-│   │   ├── onboarding/
-│   │   │   ├── presentation/
-│   │   │   │   ├── pages/
-│   │   │   │   │   └── onboarding_page.dart
-│   │   │   │   ├── widgets/
-│   │   │   │   │   ├── onboarding_slide.dart
-│   │   │   │   │   ├── budget_input_step.dart
-│   │   │   │   │   ├── category_priority_step.dart
-│   │   │   │   │   └── savings_target_step.dart
-│   │   │   │   └── bloc/
-│   │   │   │       ├── onboarding_bloc.dart
-│   │   │   │       ├── onboarding_event.dart
-│   │   │   │       └── onboarding_state.dart
-│   │   │   ├── domain/
-│   │   │   │   ├── entities/
-│   │   │   │   │   └── onboarding_data.dart
-│   │   │   │   ├── repositories/
-│   │   │   │   │   └── onboarding_repository.dart
-│   │   │   │   └── usecases/
-│   │   │   │       └── complete_onboarding.dart
-│   │   │   └── data/
-│   │   │       ├── models/
-│   │   │       │   └── onboarding_model.dart
-│   │   │       ├── datasources/
-│   │   │       │   └── onboarding_local_ds.dart   # Isar
-│   │   │       └── repositories/
-│   │   │           └── onboarding_repository_impl.dart
-│   │   │
-│   │   ├── dashboard/
-│   │   │   ├── presentation/
-│   │   │   │   ├── pages/
-│   │   │   │   │   └── dashboard_page.dart
-│   │   │   │   ├── widgets/
-│   │   │   │   │   ├── balance_card.dart
-│   │   │   │   │   ├── quick_stats_row.dart
-│   │   │   │   │   ├── budget_progress_bar.dart
-│   │   │   │   │   ├── spending_pie_chart.dart
-│   │   │   │   │   ├── recent_transactions.dart
-│   │   │   │   │   └── ai_insight_card.dart
-│   │   │   │   └── bloc/
-│   │   │   │       ├── dashboard_bloc.dart
-│   │   │   │       ├── dashboard_event.dart
-│   │   │   │       └── dashboard_state.dart
-│   │   │   ├── domain/
-│   │   │   │   ├── entities/
-│   │   │   │   │   └── dashboard_summary.dart
-│   │   │   │   ├── repositories/
-│   │   │   │   │   └── dashboard_repository.dart
-│   │   │   │   └── usecases/
-│   │   │   │       ├── get_dashboard_summary.dart
-│   │   │   │       └── get_ai_insight.dart
-│   │   │   └── data/
-│   │   │       ├── models/
-│   │   │       │   └── dashboard_cache_model.dart  # Isar collection
-│   │   │       ├── datasources/
-│   │   │       │   ├── dashboard_local_ds.dart     # Isar cache
-│   │   │       │   └── dashboard_remote_ds.dart    # API
-│   │   │       └── repositories/
-│   │   │           └── dashboard_repository_impl.dart
-│   │   │
-│   │   ├── transactions/
-│   │   │   ├── presentation/
-│   │   │   │   ├── pages/
-│   │   │   │   │   ├── add_transaction_page.dart
-│   │   │   │   │   ├── transaction_list_page.dart
-│   │   │   │   │   └── transaction_detail_page.dart
-│   │   │   │   ├── widgets/
-│   │   │   │   │   ├── amount_keypad.dart
-│   │   │   │   │   ├── category_grid.dart
-│   │   │   │   │   ├── transaction_tile.dart
-│   │   │   │   │   └── filter_sheet.dart
-│   │   │   │   └── bloc/
-│   │   │   │       ├── transaction_bloc.dart
-│   │   │   │       ├── transaction_event.dart
-│   │   │   │       └── transaction_state.dart
-│   │   │   ├── domain/
-│   │   │   │   ├── entities/
-│   │   │   │   │   └── transaction.dart
-│   │   │   │   ├── repositories/
-│   │   │   │   │   └── transaction_repository.dart
-│   │   │   │   └── usecases/
-│   │   │   │       ├── add_transaction.dart
-│   │   │   │       ├── get_transactions.dart
-│   │   │   │       ├── update_transaction.dart
-│   │   │   │       └── delete_transaction.dart
-│   │   │   └── data/
-│   │   │       ├── models/
-│   │   │       │   └── transaction_model.dart
-│   │   │       ├── datasources/
-│   │   │       │   ├── transaction_local_ds.dart    # SQLite
-│   │   │       │   └── transaction_remote_ds.dart   # API
-│   │   │       └── repositories/
-│   │   │           └── transaction_repository_impl.dart
-│   │   │
-│   │   ├── budget/
-│   │   │   ├── presentation/
-│   │   │   │   ├── pages/
-│   │   │   │   │   └── budget_planner_page.dart
-│   │   │   │   ├── widgets/
-│   │   │   │   │   ├── budget_category_card.dart
-│   │   │   │   │   └── budget_progress_chart.dart
-│   │   │   │   └── bloc/
-│   │   │   ├── domain/
-│   │   │   └── data/                               # SQLite
-│   │   │
-│   │   ├── ai_advisor/
-│   │   │   ├── presentation/
-│   │   │   │   ├── pages/
-│   │   │   │   │   └── ai_chat_page.dart
-│   │   │   │   ├── widgets/
-│   │   │   │   │   ├── chat_bubble.dart
-│   │   │   │   │   ├── quick_prompt_chips.dart
-│   │   │   │   │   └── typing_indicator.dart
-│   │   │   │   └── bloc/
-│   │   │   ├── domain/
-│   │   │   └── data/                               # Isar (chat history)
-│   │   │
-│   │   ├── reports/
-│   │   │   ├── presentation/
-│   │   │   │   ├── pages/
-│   │   │   │   │   └── reports_page.dart
-│   │   │   │   ├── widgets/
-│   │   │   │   │   ├── income_expense_bar_chart.dart
-│   │   │   │   │   ├── daily_trend_line_chart.dart
-│   │   │   │   │   ├── category_pie_chart.dart
-│   │   │   │   │   └── top_spending_list.dart
-│   │   │   │   └── bloc/
-│   │   │   ├── domain/
-│   │   │   └── data/
-│   │   │
-│   │   ├── categories/
-│   │   │   ├── presentation/
-│   │   │   ├── domain/
-│   │   │   └── data/                               # SQLite
-│   │   │
-│   │   ├── reminders/
-│   │   │   ├── presentation/
-│   │   │   │   ├── pages/
-│   │   │   │   │   ├── reminder_list_page.dart
-│   │   │   │   │   └── add_reminder_page.dart
-│   │   │   │   └── bloc/
-│   │   │   ├── domain/
-│   │   │   └── data/                               # SQLite
-│   │   │
-│   │   ├── gamification/
-│   │   │   ├── presentation/
-│   │   │   │   ├── pages/
-│   │   │   │   │   └── achievement_page.dart
-│   │   │   │   └── widgets/
-│   │   │   │       ├── streak_counter.dart
-│   │   │   │       └── achievement_badge.dart
-│   │   │   ├── domain/
-│   │   │   └── data/                               # Isar
-│   │   │
-│   │   └── settings/
-│   │       ├── presentation/
-│   │       │   ├── pages/
-│   │       │   │   ├── settings_page.dart
-│   │       │   │   └── api_key_page.dart
-│   │       │   └── bloc/
-│   │       ├── domain/
-│   │       └── data/                               # Isar (settings)
-│   │
-│   └── shared/
-│       ├── widgets/
-│       │   ├── custom_app_bar.dart
-│       │   ├── loading_shimmer.dart
-│       │   ├── empty_state.dart
-│       │   ├── error_widget.dart
-│       │   └── glassmorphic_card.dart
-│       ├── models/
-│       └── extensions/
-│           ├── context_extensions.dart
-│           ├── datetime_extensions.dart
-│           └── number_extensions.dart
-│
-├── assets/
-│   ├── icons/
-│   ├── images/
-│   └── animations/                    # Lottie files
-│
-├── pubspec.yaml
-└── analysis_options.yaml
+frontend/lib/
+├── main.dart                     # Entry point + DI init
+├── app.dart                      # BudgetKosApp widget (MultiBlocProvider, Router, Theme)
+├── core/
+│   ├── constants/                # App-wide constants
+│   ├── database/
+│   │   └── sqlite_helper.dart    # SQLite schema + seed data (6 default categories)
+│   ├── di/
+│   │   ├── injection.dart        # get_it + injectable setup
+│   │   └── injection.config.dart # Auto-generated DI config
+│   ├── errors/                   # Error handling
+│   ├── network/
+│   │   └── api_client.dart       # Dio singleton (Cloudflared tunnel URL)
+│   ├── presentation/
+│   │   └── pages/
+│   │       └── main_scaffold.dart  # Glass bottom nav bar + animated tabs
+│   ├── router/
+│   │   └── app_router.dart       # GoRouter + AnimatedBranchContainer
+│   ├── theme/
+│   │   └── app_theme.dart        # Light & Dark theme
+│   ├── utils/
+│   │   └── toast_helper.dart     # Toast notifications
+│   └── widgets/
+│       ├── network_aware_widget.dart   # Offline indicator
+│       └── pin_protection_widget.dart  # PIN lock screen
+├── features/
+│   ├── ai/
+│   │   ├── data/
+│   │   │   └── datasources/
+│   │   │       └── ai_chat_local_ds.dart   # Chat history SQLite CRUD
+│   │   └── presentation/
+│   │       └── pages/
+│   │           └── ai_chat_page.dart       # AI chat UI + automation handler
+│   ├── categories/
+│   │   ├── data/
+│   │   │   ├── datasources/
+│   │   │   │   └── category_local_ds.dart  # Category SQLite CRUD
+│   │   │   └── repositories/
+│   │   │       └── category_repository_impl.dart
+│   │   ├── domain/
+│   │   │   └── repositories/
+│   │   │       └── category_repository.dart
+│   │   └── presentation/
+│   │       ├── bloc/
+│   │       │   ├── category_bloc.dart
+│   │       │   ├── category_event.dart
+│   │       │   └── category_state.dart
+│   │       └── pages/
+│   │           ├── categories_page.dart
+│   │           └── category_form_page.dart
+│   ├── dashboard/
+│   │   └── presentation/
+│   │       └── pages/
+│   │           └── dashboard_page.dart     # Home screen (saldo, chart, recent tx)
+│   ├── onboarding/                         # First-run onboarding flow
+│   ├── profile/
+│   │   └── presentation/
+│   │       └── pages/
+│   │           └── profile_page.dart       # User settings
+│   ├── reports/
+│   │   └── presentation/
+│   │       └── pages/
+│   │           └── reports_page.dart       # Financial reports & PDF export
+│   ├── splash/                             # Splash screen
+│   ├── transaction/
+│   │   ├── data/
+│   │   │   └── models/
+│   │   │       ├── transaction_model.dart  # Model with fromJson/toJson
+│   │   │       └── category_model.dart     # Category model (feature-local)
+│   │   ├── domain/
+│   │   │   └── repositories/
+│   │   │       └── transaction_repository.dart  # SQLite-based repository
+│   │   └── presentation/
+│   │       ├── bloc/
+│   │       │   ├── transaction_bloc.dart    # Core BLoC (CRUD + chart data)
+│   │       │   ├── transaction_event.dart   # Events (Fetch, Add, Update, Delete, ChartFilter)
+│   │       │   └── transaction_state.dart   # States (Initial, Loading, Loaded, Error)
+│   │       └── widgets/
+│   │           └── transaction_bottom_sheet.dart  # FAB bottom sheet for adding tx
+│   └── transactions/
+│       ├── data/
+│       │   └── datasources/
+│       │       └── transaction_local_ds.dart     # Injectable SQLite datasource
+│       └── presentation/
+│           └── pages/
+│               ├── transactions_page.dart        # Full transaction list
+│               └── add_transaction_page.dart      # Add transaction form
+└── shared/
+    ├── extensions/                # Dart extensions
+    ├── models/
+    │   ├── category_model.dart   # Shared category model (fromMap/toMap)
+    │   └── transaction_model.dart # Shared transaction model (fromMap/toMap)
+    └── widgets/                  # Reusable UI components
 ```
 
 ---
 
-## 5. Backend API Design
+## 5. Database Schema
 
-### 5.1 Base URL & Versioning
-```
-Base URL: http://localhost:8080/api/v1
-Content-Type: application/json
-```
-
-### 5.2 Standard Response Format
-```json
-{
-  "success": true,
-  "message": "Berhasil mengambil data",
-  "data": { ... },
-  "meta": {
-    "page": 1,
-    "limit": 20,
-    "total": 150
-  }
-}
-```
-
-### 5.3 API Endpoints
-
-#### 👤 User Module
-| Method | Endpoint | Deskripsi |
-|--------|----------|-----------|
-| `POST` | `/users` | Buat profil user baru (onboarding) |
-| `GET` | `/users/:id` | Ambil profil user |
-| `PUT` | `/users/:id` | Update profil user |
-| `PUT` | `/users/:id/onboarding` | Simpan data onboarding lengkap |
-
-#### 📝 Transaction Module
-| Method | Endpoint | Deskripsi |
-|--------|----------|-----------|
-| `POST` | `/transactions` | Tambah transaksi baru |
-| `GET` | `/transactions` | Daftar transaksi (filter, pagination, search) |
-| `GET` | `/transactions/:id` | Detail transaksi |
-| `PUT` | `/transactions/:id` | Update transaksi |
-| `DELETE` | `/transactions/:id` | Hapus transaksi |
-| `GET` | `/transactions/summary` | Ringkasan (total income, expense, balance) |
-| `POST` | `/transactions/batch` | Sync batch transaksi dari lokal |
-
-**Query Parameters untuk GET `/transactions`:**
-```
-?type=expense|income
-&category_id=1
-&start_date=2026-01-01
-&end_date=2026-01-31
-&search=makan
-&page=1
-&limit=20
-&sort=date_desc
-```
-
-#### 🏷️ Category Module
-| Method | Endpoint | Deskripsi |
-|--------|----------|-----------|
-| `GET` | `/categories` | Daftar semua kategori |
-| `POST` | `/categories` | Tambah kategori custom |
-| `PUT` | `/categories/:id` | Update kategori |
-| `DELETE` | `/categories/:id` | Hapus kategori custom |
-| `GET` | `/categories/defaults` | Seed kategori default |
-
-#### 💰 Budget Module
-| Method | Endpoint | Deskripsi |
-|--------|----------|-----------|
-| `POST` | `/budgets` | Set budget bulan ini |
-| `GET` | `/budgets` | Ambil budget aktif (bulan & tahun) |
-| `PUT` | `/budgets/:id` | Update budget |
-| `GET` | `/budgets/progress` | Progress budget vs aktual per kategori |
-| `GET` | `/budgets/history` | Histori budget bulan-bulan sebelumnya |
-
-#### ⏰ Reminder Module
-| Method | Endpoint | Deskripsi |
-|--------|----------|-----------|
-| `POST` | `/reminders` | Buat reminder baru |
-| `GET` | `/reminders` | Daftar reminder |
-| `PUT` | `/reminders/:id` | Update reminder |
-| `DELETE` | `/reminders/:id` | Hapus reminder |
-| `PUT` | `/reminders/:id/pay` | Tandai sebagai terbayar (auto-create transaksi) |
-
-#### 🤖 AI Module
-| Method | Endpoint | Deskripsi |
-|--------|----------|-----------|
-| `POST` | `/ai/chat` | Chat dengan AI Advisor |
-| `POST` | `/ai/analyze-spending` | Analisis pola pengeluaran |
-| `POST` | `/ai/budget-recommendation` | Rekomendasi alokasi budget |
-| `POST` | `/ai/daily-insight` | Generate insight harian untuk dashboard |
-| `GET` | `/ai/chat-history` | Riwayat percakapan |
-
-**Request body untuk `/ai/chat`:**
-```json
-{
-  "message": "Analisis pengeluaran saya bulan ini",
-  "api_key": "user-provided-gemini-key",
-  "context": {
-    "monthly_income": 2000000,
-    "total_expense": 1500000,
-    "top_categories": [
-      {"name": "Makan", "amount": 600000},
-      {"name": "Transportasi", "amount": 300000}
-    ],
-    "budget_remaining": 500000,
-    "days_remaining": 12
-  }
-}
-```
-
-#### 📊 Report Module
-| Method | Endpoint | Deskripsi |
-|--------|----------|-----------|
-| `GET` | `/reports/summary` | Ringkasan periode (income, expense, saving) |
-| `GET` | `/reports/by-category` | Breakdown per kategori |
-| `GET` | `/reports/daily-trend` | Tren harian |
-| `GET` | `/reports/monthly-comparison` | Perbandingan antar bulan |
-| `GET` | `/reports/export/csv` | Export CSV |
-
-#### 🏆 Gamification Module
-| Method | Endpoint | Deskripsi |
-|--------|----------|-----------|
-| `GET` | `/gamification/achievements` | Daftar semua achievement + status |
-| `GET` | `/gamification/streak` | Streak saat ini |
-| `POST` | `/gamification/check` | Cek & unlock achievement baru |
-
----
-
-## 6. Database Design
-
-### 6.1 SQLite Schema (Relational Data)
+### 5.1 Backend SQLite (GORM AutoMigrate)
 
 ```mermaid
 erDiagram
-    CATEGORIES ||--o{ TRANSACTIONS : "has"
-    CATEGORIES ||--o{ BUDGETS : "limits"
-    CATEGORIES ||--o{ REMINDERS : "tagged"
+    categories {
+        uint id PK
+        string name "NOT NULL"
+        string icon "NOT NULL"
+        string color "NOT NULL"
+        string type "NOT NULL (income|expense)"
+        bool is_default "DEFAULT false"
+        int sort_order "DEFAULT 0"
+        datetime created_at
+        datetime updated_at
+    }
 
-    TRANSACTIONS {
-        int id PK
-        string title
-        double amount
-        string type "income | expense"
-        int category_id FK
+    transactions {
+        uint id PK
+        string title "NOT NULL"
+        float64 amount "NOT NULL"
+        string type "NOT NULL (income|expense)"
+        uint category_id FK
         string notes
-        datetime date
+        datetime date "NOT NULL"
         datetime created_at
         datetime updated_at
-        bool is_synced
+        bool is_synced "DEFAULT true"
     }
 
-    CATEGORIES {
-        int id PK
-        string name
-        string icon
-        string color
-        string type "income | expense"
-        bool is_default
-        int sort_order
-    }
-
-    BUDGETS {
-        int id PK
-        int category_id FK
-        double limit_amount
-        int month
-        int year
+    budgets {
+        uint id PK
+        uint category_id FK "NOT NULL"
+        float64 limit_amount "NOT NULL"
+        int month "NOT NULL"
+        int year "NOT NULL"
         datetime created_at
         datetime updated_at
     }
 
-    REMINDERS {
-        int id PK
-        string title
-        double amount
-        int category_id FK
-        string recurrence "once | daily | weekly | monthly"
-        datetime due_date
-        bool is_active
-        datetime created_at
-    }
+    categories ||--o{ transactions : "has many"
+    categories ||--o{ budgets : "has many"
 ```
 
-### 6.2 Isar Collections (NoSQL Data)
+### 5.2 Frontend SQLite (sqflite Manual Schema)
 
-```dart
-// === User Profile ===
-@collection
-class UserProfile {
-  Id id = Isar.autoIncrement;
-  String name = '';
-  double monthlyIncome = 0;
-  String avatarEmoji = '😊';
-  bool onboardingCompleted = false;
-  List<String> priorityCategories = [];   // Kategori prioritas dari onboarding
-  double savingsTarget = 0;               // Target tabungan bulanan
-  DateTime createdAt = DateTime.now();
-  DateTime updatedAt = DateTime.now();
-}
+| Tabel | Kolom | Catatan |
+|---|---|---|
+| `transactions` | id, title, amount, type, category_id, notes, date, created_at, updated_at, is_synced | Skema identik dengan backend |
+| `categories` | id, name, icon, color, type, is_default, sort_order | 6 kategori default di-*seed* saat `onCreate` |
+| `ai_chats` | id, prompt, response, timestamp | Riwayat percakapan AI lokal |
 
-// === Dashboard Cache ===
-@collection
-class DashboardCache {
-  Id id = Isar.autoIncrement;
-  double totalIncome = 0;
-  double totalExpense = 0;
-  double balance = 0;
-  double budgetProgress = 0;              // Persentase 0-100
-  String topCategoriesJson = '[]';        // JSON serialized
-  String aiInsight = '';                   // Cached daily insight
-  DateTime lastUpdated = DateTime.now();
-  int month = 0;
-  int year = 0;
-}
+**Default Categories (Seed Data):**
 
-// === AI Chat History ===
-@collection
-class AiChatMessage {
-  Id id = Isar.autoIncrement;
-  String role = '';                       // 'user' | 'assistant'
-  String message = '';
-  DateTime timestamp = DateTime.now();
-}
-
-// === Achievement ===
-@collection
-class Achievement {
-  Id id = Isar.autoIncrement;
-  String code = '';                       // 'streak_7', 'budget_master', etc.
-  String title = '';
-  String description = '';
-  String icon = '';
-  bool isUnlocked = false;
-  double progress = 0;                    // 0.0 - 1.0
-  DateTime? unlockedAt;
-}
-
-// === App Settings ===
-@collection
-class AppSettings {
-  Id id = Isar.autoIncrement;
-  String themeMode = 'system';            // 'light' | 'dark' | 'system'
-  bool dailyReminderEnabled = true;
-  int dailyReminderHour = 21;             // Jam 21:00
-  int dailyReminderMinute = 0;
-  String currency = 'IDR';
-  bool hapticFeedbackEnabled = true;
-  int currentStreak = 0;
-  DateTime? lastRecordDate;
-}
-
-// === Onboarding Data ===
-@collection
-class OnboardingData {
-  Id id = Isar.autoIncrement;
-  String userName = '';
-  double monthlyBudget = 0;
-  double savingsTarget = 0;
-  List<String> priorityCategories = [];   // ['Makan', 'Kos', 'Transportasi']
-  String financialGoal = '';              // 'hemat' | 'tabungan' | 'investasi'
-  DateTime completedAt = DateTime.now();
-}
-```
-
-### 6.3 Kategori Default (Seeded)
-
-**Pengeluaran:**
-| Icon | Nama | Color |
-|------|------|-------|
-| 🍜 | Makan & Minum | `#EF4444` |
-| 🏠 | Kos / Sewa | `#F97316` |
-| 🚌 | Transportasi | `#3B82F6` |
-| 📚 | Pendidikan & Buku | `#8B5CF6` |
-| 📱 | Pulsa & Internet | `#06B6D4` |
-| 👕 | Pakaian | `#EC4899` |
-| 🎮 | Hiburan | `#F59E0B` |
-| 💊 | Kesehatan | `#10B981` |
-| 🛒 | Belanja Harian | `#6366F1` |
-| 💡 | Listrik & Air | `#14B8A6` |
-| 🔧 | Lainnya | `#64748B` |
-
-**Pemasukan:**
-| Icon | Nama | Color |
-|------|------|-------|
-| 💰 | Kiriman Orang Tua | `#10B981` |
-| 🎓 | Beasiswa | `#6366F1` |
-| 💼 | Kerja Part-time | `#3B82F6` |
-| 🎁 | Hadiah / Bonus | `#F59E0B` |
-| 📦 | Penjualan Barang | `#8B5CF6` |
-| 🔧 | Lainnya | `#64748B` |
+| ID | Nama | Tipe | Ikon | Warna |
+|---|---|---|---|---|
+| 1 | Makanan | expense | restaurant | #FF9800 |
+| 2 | Transportasi | expense | directions_car | #2196F3 |
+| 3 | Tagihan | expense | receipt | #F44336 |
+| 4 | Belanja | expense | shopping_cart | #9C27B0 |
+| 5 | Gaji | income | account_balance_wallet | #4CAF50 |
+| 6 | Bonus | income | card_giftcard | #00BCD4 |
 
 ---
 
-## 7. Daftar Halaman / Screen
+## 6. API Endpoints
 
-### 7.1 Splash Screen
-- Logo animasi BudgetKos AI dengan efek fade-in + scale
-- Cek status onboarding → navigasi ke Onboarding atau Dashboard
-- Loading indicator subtle
+Semua endpoint di-prefix dengan `/api/v1`.
 
-### 7.2 Onboarding Screen (5 step — enhanced)
-- **Step 1: Selamat Datang** — Ilustrasi + deskripsi singkat BudgetKos AI
-- **Step 2: Profil** — Input nama, pilih avatar emoji
-- **Step 3: Budget Bulanan** — Input estimasi pemasukan bulanan + target tabungan (slider)
-- **Step 4: Kategori Prioritas** — Pilih 3-5 kategori pengeluaran utama (chip selector) untuk fokus monitoring
-- **Step 5: Tujuan Keuangan** — Pilih tujuan: "Hemat pengeluaran", "Nabung rutin", "Kelola budget ketat" (mempengaruhi saran AI)
-- Progress indicator dots di atas
-- Tombol "Lanjut" dan "Kembali"
-- Step terakhir: tombol "Mulai Sekarang" 🚀
+### 6.1 Category
 
-### 7.3 Dashboard (Home)
-- **Greeting** personalisasi (Selamat pagi/siang/malam, {nama})
-- **Balance Card** — Glassmorphic card: saldo saat ini dengan animasi counter
-- **Quick Stats Row** — Total Pemasukan ↑, Total Pengeluaran ↓, Sisa Budget
-- **Budget Progress Bar** — Visual gradient bar (hijau → kuning → merah)
-- **Spending Pie Chart** — Interaktif, tap segment untuk detail kategori
-- **Transaksi Terakhir** — 5 transaksi terbaru, tap untuk detail
-- **AI Insight Card** — Saran harian dari Gemini (cached di Isar)
-- **Streak Badge** — "🔥 7 Hari Berturut-turut!" mini badge
-- **Quick Action FAB** — Floating button tambah transaksi
+| Method | Path | Handler | Deskripsi |
+|---|---|---|---|
+| GET | `/categories` | `category.GetAll` | Ambil semua kategori |
+| POST | `/categories` | `category.Create` | Buat kategori baru |
+| PUT | `/categories/:id` | `category.Update` | Update kategori |
+| DELETE | `/categories/:id` | `category.Delete` | Hapus kategori |
 
-### 7.4 Tambah Transaksi
-- Toggle **Pengeluaran / Pemasukan** (tab animasi warna)
-- **Amount Keypad** — Numpad besar custom, format Rupiah otomatis
-- **Kategori Grid** — Icon grid scrollable, highlight prioritas
-- **Judul** — Text field + autocomplete dari histori
-- **Tanggal** — Date picker (default hari ini)
-- **Catatan** — Optional, collapsible
-- **Tombol Simpan** — Animasi success ✓ + confetti
+### 6.2 Transaction
 
-### 7.5 Daftar Transaksi
-- **Filter Bar** — Periode, Tipe, Kategori
-- **Search** — Cari judul/catatan
-- **Grouped List** — Per tanggal, subtotal per hari
-- **Swipe Actions** — Kiri: hapus (merah), Kanan: edit (biru)
-- **Summary Header** — Total filtered period
+| Method | Path | Handler | Deskripsi |
+|---|---|---|---|
+| GET | `/transactions` | `transaction.GetAll` | Ambil semua transaksi |
+| POST | `/transactions` | `transaction.Create` | Buat transaksi baru |
+| PUT | `/transactions/:id` | `transaction.Update` | Update transaksi |
+| DELETE | `/transactions/:id` | `transaction.Delete` | Hapus transaksi |
 
-### 7.6 Detail Transaksi
-- Card detail lengkap (judul, jumlah, kategori, tanggal, catatan)
-- Tombol Edit & Hapus
-- Navigasi kembali
+### 6.3 Budget
 
-### 7.7 Budget Planner
-- **Set Budget Total** — Input total budget bulan ini
-- **Alokasi per Kategori** — Slider/input per kategori
-- **Progress Chart** — Horizontal bar tiap kategori (budget vs aktual)
-- **Over-budget Alert** — Badge merah + warning
-- **AI Suggestion Button** — Rekomendasi alokasi dari Gemini
+| Method | Path | Handler | Deskripsi |
+|---|---|---|---|
+| GET | `/budgets` | `budget.GetAll` | Ambil semua budget |
+| POST | `/budgets` | `budget.Create` | Buat budget baru |
+| PUT | `/budgets/:id` | `budget.Update` | Update budget |
+| DELETE | `/budgets/:id` | `budget.Delete` | Hapus budget |
 
-### 7.8 AI Advisor (Chat)
-- **Chat UI** — Bubble messages (user: kanan, AI: kiri)
-- **Quick Prompt Chips:**
-  - "📊 Analisis pengeluaran bulan ini"
-  - "💰 Berapa yang bisa saya tabung?"
-  - "💡 Tips hemat untuk anak kos"
-  - "📈 Prediksi pengeluaran minggu depan"
-  - "🎯 Evaluasi target tabungan saya"
-- **Typing Indicator** — Animasi dots saat menunggu response
-- **Chat History** — Scroll ke percakapan sebelumnya (Isar)
+### 6.4 AI Chat
 
-### 7.9 Laporan Keuangan (Reports)
-- **Periode Selector** — Minggu ini / Bulan ini / 3 Bulan / Custom
-- **Summary Cards** — Pemasukan, Pengeluaran, Tabungan
-- **Bar Chart** — Income vs Expense per minggu/bulan
-- **Line Chart** — Tren pengeluaran harian
-- **Pie Chart** — Distribusi per kategori
-- **Top 5 Spending** — Kategori tertinggi
-- **Export CSV Button** — Download CSV
+| Method | Path | Handler | Deskripsi |
+|---|---|---|---|
+| POST | `/ai/chat` | `ai.Chat` | Kirim pesan + local_context, terima reply + created_transactions |
 
-### 7.10 Pengingat / Reminders
-- **Daftar Reminder** — Sortir by due date
-- **Status Badge** — Upcoming (kuning), Overdue (merah), Paid (hijau)
-- **Tambah Reminder** — Judul, jumlah, frekuensi, due date
-- **Mark as Paid** → Auto-create transaksi pengeluaran
-- **Notifikasi Push** — Pada tanggal jatuh tempo
+### 6.5 Utility
 
-### 7.11 Kategori Management
-- **Daftar** — Default + custom, drag to reorder
-- **Tambah Custom** — Nama, icon picker, color picker, tipe
-- **Edit / Hapus** — Kategori default tidak bisa dihapus
-
-### 7.12 Gamification / Achievement
-- **Streak Counter** — Hari berturut-turut catat transaksi (🔥 animasi)
-- **Achievement Grid:**
-  - 🔥 "Konsisten 7 Hari"
-  - 💪 "Budget Master" — Tidak melebihi budget 1 bulan
-  - 📊 "Data Driven" — 100 transaksi tercatat
-  - 🎯 "Hemat Hero" — Pengeluaran < 80% budget
-  - 🏆 "Tabungan Champion" — Nabung 3 bulan berturut-turut
-  - 📝 "Pencatat Handal" — 30 hari streak
-- **Progress Bar** — Progress ke achievement berikutnya
-- **Unlock Animation** — Celebratory animation + haptic
-
-### 7.13 Settings
-- **Profil** — Edit nama, avatar emoji
-- **Budget Default** — Ubah budget bulanan default
-- **Target Tabungan** — Edit target tabungan
-- **Tema** — Light / Dark / Sistem
-- **Notifikasi Harian** — Toggle ON/OFF + **Time Picker** untuk atur jam pengingat (default 21:00)
-- **Notifikasi Budget** — Toggle ON/OFF pengingat saat mendekati/melebihi limit
-- **Gemini API Key** — Input API key (masked, stored in secure storage)
-- **Server URL** — Konfigurasi URL backend
-- **Data** — Export CSV, Import CSV, Reset semua data (konfirmasi ganda)
-- **Tentang** — Versi, lisensi
-
-### 7.14 Bottom Navigation
-4 tab + FAB tengah:
-1. 🏠 **Beranda** (Dashboard)
-2. 📊 **Laporan** (Reports)
-3. ➕ **FAB** (Tambah Transaksi) — Floating di tengah
-4. 🤖 **AI Advisor** (Chat)
-5. ⚙️ **Pengaturan** (Settings)
+| Method | Path | Deskripsi |
+|---|---|---|
+| GET | `/ping` | Health check → `{"message": "pong"}` |
 
 ---
 
-## 8. Integrasi Gemini AI — Detail
+## 7. Alur AI Automation (Bud-AI)
 
-### Prompt Engineering
-
-```
-System Prompt:
-"Kamu adalah BudgetKos AI, asisten keuangan pribadi untuk mahasiswa kos di Indonesia.
-Kamu membantu mengelola keuangan bulanan dengan budget terbatas (Rp 1-3 juta/bulan).
-Berikan saran yang praktis, spesifik, dan menggunakan bahasa Indonesia yang ramah dan santai.
-Gunakan data keuangan pengguna untuk memberikan insight yang personal.
-Format jawaban dengan poin-poin singkat dan emoji yang relevan.
-Jangan pernah menjawab pertanyaan di luar konteks keuangan pribadi."
-```
-
-### Use Cases
-
-| Use Case | Trigger | Data yang Dikirim | Output |
-|----------|---------|-------------------|--------|
-| Analisis Pengeluaran | User klik "Analisis" | Transaksi 1 bulan (aggregated) | Pola spending, perbandingan kategori |
-| Rekomendasi Budget | User buka Budget Planner | Income + histori 3 bulan | Alokasi optimal per kategori |
-| Deteksi Anomali | Auto setelah input transaksi besar | Transaksi baru vs rata-rata | Alert jika anomali |
-| Daily Insight | Auto refresh dashboard | Summary bulan ini | 1 kalimat insight/tips |
-| Chat Bebas | User ketik di AI Chat | Pesan + context keuangan | Jawaban relevan |
-
-### Pipeline
+Ini adalah fitur inti yang membedakan BudgetKos AI dari aplikasi keuangan biasa.
 
 ```mermaid
-flowchart LR
-    A["Flutter App"] -->|"POST /ai/chat"| B["Go Backend"]
-    B --> C["Context Builder"]
-    C --> D["Prompt Template Engine"]
-    D --> E["Gemini API (google/generative-ai-go)"]
-    E --> F["Response Parser"]
-    F --> G["JSON Response"]
-    G --> A
-    A --> H["Cache di Isar"]
+sequenceDiagram
+    actor User
+    participant Flutter as 📱 Flutter App
+    participant SQLite as 📦 SQLite Lokal
+    participant Backend as 🖥️ Go Backend
+    participant Gemini as 🤖 Gemini 2.5 Flash
+
+    User->>Flutter: "Tolong catat makan 15 ribu"
+    Flutter->>SQLite: getTransactions()
+    SQLite-->>Flutter: [daftar transaksi + total]
+
+    Flutter->>Backend: POST /ai/chat
+    Note right of Flutter: Body: {<br/> "message": "...",<br/> "local_context": {<br/>   "total_income": 500000,<br/>   "total_expense": 200000,<br/>   "recent_transactions": [...]<br/> }<br/>}
+
+    Backend->>Backend: Fetch valid categories from DB
+    Backend->>Gemini: GenerateContent()
+    Note right of Backend: System Prompt:<br/>- Daftar kategori valid<br/>- Data keuangan riil user<br/>- Instruksi structured JSON
+
+    Gemini-->>Backend: {<br/> "reply": "Oke udah dicatet!",<br/> "created_transactions": [{<br/>   "title": "Makan",<br/>   "amount": 15000,<br/>   "type": "expense",<br/>   "category_id": 1<br/> }]<br/>}
+
+    Backend->>Backend: txService.Create() → save to backend DB
+    Backend-->>Flutter: 200 OK + reply + created_transactions (with IDs)
+
+    Flutter->>SQLite: insertTransaction(model)
+    Flutter->>Flutter: TransactionBloc.add(FetchTransactions())
+    Flutter-->>User: Chat bubble + Dashboard updated ✨
 ```
 
-### Error Handling & Security
-- API key dikirim per-request dari client (tidak disimpan di backend)
-- Retry 3x dengan exponential backoff
-- Rate limiting: max 20 request/menit per user
-- Fallback message jika API gagal
-- Data yang dikirim ke Gemini: hanya data agregat, bukan raw transaksi
+### 7.1 Detail Implementasi AI
+
+**Backend** (`ai/service.go`):
+- Model: `gemini-2.5-flash`
+- `ResponseMIMEType`: `application/json` (memaksa output JSON)
+- **System Prompt** berisi:
+  1. Persona konsultan keuangan anak kos (bahasa gaul)
+  2. Instruksi otomasi: jika diminta mencatat, masukkan ke `created_transactions[]`
+  3. Daftar kategori valid dari database (ID + Name + Type)
+  4. Data keuangan riil dari `local_context` HP user
+- **Parsing**: Response JSON di-*unmarshal* ke `GeminiResponse` struct
+- **Execution**: Setiap item di `created_transactions` langsung di-*create* via `txService.Create()`
+
+**Frontend** (`ai_chat_page.dart`):
+- Mengumpulkan 50 transaksi terakhir + total income/expense dari SQLite lokal
+- Mengirim sebagai `local_context` dalam POST body
+- Jika response mengandung `created_transactions`, masing-masing disimpan ke SQLite lokal via `TransactionLocalDataSource.insertTransaction()`
+- Memicu `TransactionBloc.add(FetchTransactions())` agar Dashboard auto-refresh
 
 ---
 
-## 9. Notifikasi Harian
+## 8. Navigasi & UI
 
-### Implementasi
-- **Package:** `flutter_local_notifications`
-- **Default waktu:** 21:00 — **dapat diubah oleh pengguna** melalui **Time Picker** di halaman Settings
-- **Konfigurasi di Settings:**
-  - Toggle ON/OFF pengingat harian
-  - **Time Picker** untuk memilih jam & menit pengingat (format 24 jam)
-  - Disimpan di Isar `AppSettings.dailyReminderHour` & `AppSettings.dailyReminderMinute`
-  - Saat user mengubah waktu → cancel notifikasi lama, schedule ulang dengan waktu baru
-- **Pesan dinamis:**
-  - Jika belum catat hari ini → "📝 Sudah catat pengeluaran hari ini? Yuk catat biar keuanganmu terpantau!"
-  - Jika sudah catat hari ini → "🎉 Mantap! Kamu sudah catat hari ini. Pertahankan streakmu!"
-- **Streak integration:** Jika user catat setiap hari → increment streak
+### 8.1 Bottom Navigation (Glass Morphism)
 
----
+```
+┌──────────────────────────────────────┐
+│  🏠 Beranda  📊 Laporan  ➕  ✨ Chat AI  👤 Profil  │
+└──────────────────────────────────────┘
+```
 
-## 10. UI/UX Design System
+- Implementasi: `MainScaffold` dengan `StatefulShellRoute` dari `go_router`
+- Transisi: `AnimatedBranchContainer` — slide horizontal antar halaman (bukan fade)
+- FAB di tengah: Membuka `TransactionBottomSheet` untuk input transaksi cepat
+- Desain: Glassmorphism (`BackdropFilter` + `ClipRRect`)
 
-### Color Palette
+### 8.2 Halaman Utama
 
-| Token | Light Mode | Dark Mode | Penggunaan |
-|-------|-----------|-----------|------------|
-| Primary | `#0D9488` (Teal 600) | `#2DD4BF` (Teal 400) | Tombol utama, aksen |
-| Secondary | `#6366F1` (Indigo 500) | `#818CF8` (Indigo 400) | AI features, secondary |
-| Background | `#F8FAFC` (Slate 50) | `#0F172A` (Slate 900) | Background utama |
-| Surface | `#FFFFFF` | `#1E293B` (Slate 800) | Cards, sheets |
-| Income | `#10B981` (Emerald 500) | `#34D399` (Emerald 400) | Pemasukan |
-| Expense | `#EF4444` (Red 500) | `#F87171` (Red 400) | Pengeluaran |
-| Warning | `#F59E0B` (Amber 500) | `#FBBF24` (Amber 400) | Budget warning |
+| Route | Halaman | Deskripsi |
+|---|---|---|
+| `/` | `DashboardPage` | Saldo, chart (fl_chart), transaksi terbaru |
+| `/reports` | `ReportsPage` | Laporan keuangan, PDF export |
+| `/ai` | `AIChatPage` | Chat AI (Bud-AI) dengan otomasi |
+| `/profile` | `ProfilePage` | Pengaturan user |
 
-### Typography
-- **Heading:** Poppins (Bold/SemiBold)
-- **Body:** Inter (Regular/Medium)
-- **Numbers:** Poppins (Bold) — angka keuangan
+### 8.3 Fitur Keamanan
 
-### Design Principles
-1. **Glassmorphism** — Translucent cards + blur pada dashboard
-2. **Micro-animations** — Smooth transitions, bounce FAB, slide-in list
-3. **8px Grid** — Consistent spacing
-4. **Rounded Corners** — 12-16px radius
-5. **Subtle Shadows** — Depth hierarchy
-6. **Haptic Feedback** — Vibration pada aksi penting
+- **PIN Protection**: `PinProtectionWidget` membungkus seluruh app di `app.dart`
+- **Secure Storage**: `flutter_secure_storage` untuk menyimpan PIN secara terenkripsi
+- **Network Awareness**: `NetworkAwareWidget` menampilkan indikator offline
 
 ---
 
-## 11. Verification Plan
+## 9. State Management (BLoC)
 
-### Automated Tests
+### 9.1 TransactionBloc
+
+```mermaid
+stateDiagram-v2
+    [*] --> TransactionInitial
+    TransactionInitial --> TransactionLoading : FetchTransactions
+    TransactionLoading --> TransactionLoaded : Success
+    TransactionLoading --> TransactionError : Failure
+
+    TransactionLoaded --> TransactionLoaded : AddTransaction
+    TransactionLoaded --> TransactionLoaded : UpdateTransaction
+    TransactionLoaded --> TransactionLoaded : DeleteTransaction
+    TransactionLoaded --> TransactionLoaded : AddCategory
+    TransactionLoaded --> TransactionLoaded : ChangeChartFilter
+```
+
+**Events:**
+- `FetchTransactions` — Fetch semua transaksi + kategori + hitung saldo
+- `AddTransaction` — Tambah transaksi baru
+- `UpdateTransaction` — Edit transaksi
+- `DeleteTransaction` — Hapus transaksi
+- `AddCategory` — Tambah kategori baru
+- `ChangeChartFilter` — Ganti filter chart (income / expense / balance)
+
+**State `TransactionLoaded` mengandung:**
+- `List<TransactionModel> transactions`
+- `List<CategoryModel> categories`
+- `double totalIncome, totalExpense, balance`
+- `ChartFilterType chartFilter`
+- `List<FlSpot> chartData`
+
+---
+
+## 10. Dependency Injection
+
+```mermaid
+graph LR
+    main.dart --> configureDependencies
+    configureDependencies --> getIt["get_it (Service Locator)"]
+    getIt --> SqliteHelper["@lazySingleton SqliteHelper"]
+    getIt --> TransactionLocalDS["@lazySingleton TransactionLocalDataSourceImpl"]
+    getIt --> CategoryLocalDS["@lazySingleton CategoryLocalDataSourceImpl"]
+    getIt --> AiChatLocalDS["@lazySingleton AiChatLocalDataSourceImpl"]
+```
+
+- `SqliteHelper` — Singleton yang mengelola koneksi SQLite
+- `TransactionLocalDataSource` — CRUD transaksi SQLite
+- `CategoryLocalDataSource` — CRUD kategori SQLite
+- `AiChatLocalDataSource` — CRUD riwayat chat AI SQLite
+
+---
+
+## 11. Konfigurasi Backend
+
+### 11.1 Environment Variables (`.env`)
+
+| Key | Default | Deskripsi |
+|---|---|---|
+| `PORT` | `8080` | Port HTTP server |
+| `DB_FILE` | `budgetkos.db` | Path file SQLite |
+| `GIN_MODE` | `debug` | Mode Gin (debug/release) |
+| `GEMINI_API_KEY` | — | API Key Google Gemini |
+
+### 11.2 Alur Boot Backend
+
+```
+main.go
+  ├── config.InitConfig()        → Load .env via Viper
+  ├── database.ConnectDB()       → GORM Open SQLite
+  ├── database.MigrateDB()       → AutoMigrate (Category, Transaction, Budget)
+  └── router.SetupRouter()       → Gin Engine + CORS + RegisterRoutes
+       ├── category.RegisterRoutes()
+       ├── transaction.RegisterRoutes()
+       ├── budget.RegisterRoutes()
+       └── ai.RegisterRoutes()
+            └── Inject: txService + catService → ai.NewService()
+```
+
+---
+
+## 12. Deployment
+
+### 12.1 Lokal (Development)
+
 ```bash
-# Backend tests
-cd backend && go test ./...
+# Terminal 1: Backend
+cd backend
+go run cmd/server/main.go
 
-# Frontend unit tests
-cd frontend && flutter test
+# Terminal 2: Cloudflared Tunnel
+.\cloudflared.exe tunnel --url http://localhost:8081
 
-# Frontend widget tests
-cd frontend && flutter test --tags=widget
+# Terminal 3: Flutter (jika debugging)
+cd frontend
+flutter run
 ```
 
-### Manual Verification
-1. **Backend:** Jalankan `go run cmd/server/main.go`, test via Postman/curl
-2. **Frontend:** `flutter run` pada emulator Android API 34
-3. **Functional:** CRUD transaksi, set budget, chat AI, export CSV
-4. **UI/UX:** Light/Dark theme, animasi 60fps, responsive
-5. **Performance:**
-   - App launch < 2 detik
-   - DB query < 100ms
-   - APK size < 30MB
+- Cloudflared menghasilkan URL publik random (e.g. `https://xxx.trycloudflare.com`)
+- URL ini harus di-update di `frontend/lib/core/network/api_client.dart` → `_tunnelUrl`
+
+### 12.2 Build APK
+
+```bash
+cd frontend
+flutter build apk --release
+# Output: build/app/outputs/flutter-apk/app-release.apk (~56 MB)
+```
+
+### 12.3 Docker (Production-ready)
+
+```bash
+cd backend
+docker build -t budgetkos-backend .
+docker run -p 8080:8080 -v /data:/data budgetkos-backend
+```
 
 ---
 
-## 12. Timeline Development
+## 13. Modul Belum Diimplementasi
 
-### Fase 1 — Foundation
-- Setup Flutter project & Go project
-- Folder structure kedua sisi
-- SQLite + Isar setup di Flutter
-- GORM + migrations di Go
-- Theme system (Light/Dark)
-- Bottom navigation & routing
-- API client (Dio) + standard response
+Direktori berikut sudah ada di `backend/internal/modules/` tetapi masih **kosong**:
 
-### Fase 2 — Core Features
-- Kategori CRUD (backend + frontend)
-- Transaksi CRUD (backend + frontend + SQLite)
-- Dashboard screen + chart + Isar cache
-- Budget planner & progress monitoring
+| Modul | Tujuan (Planned) |
+|---|---|
+| `gamification/` | Sistem poin, badge, achievement untuk memotivasi pengguna |
+| `reminder/` | Pengingat harian untuk mencatat pengeluaran |
+| `report/` | Endpoint laporan keuangan server-side |
+| `user/` | Manajemen user, autentikasi, multi-user support |
 
-### Fase 3 — AI & Advanced
-- Gemini integration di Go backend
-- AI Advisor chat screen
-- AI insight card di dashboard
-- Bill reminders + notifikasi lokal
-- Notifikasi harian (jam 21:00)
+---
 
-### Fase 4 — Gamification & Polish
-- Achievement system (Isar)
-- Streak counter
-- Onboarding flow (5 step)
-- Reports + CSV export
-- Settings lengkap (API key, server URL)
+## 14. Keputusan Arsitektural
 
-### Fase 5 — Optimization & Testing
-- Animations & micro-interactions
-- Performance optimization
-- Error handling & edge cases
-- Final testing & bug fixes
+| Keputusan | Pilihan | Alasan |
+|---|---|---|
+| Database backend | SQLite | Ringan, portable, tidak butuh server DB terpisah |
+| Database frontend | sqflite | Native SQLite di Android, offline-first |
+| AI data source | Local Context (HP → Backend) | DB backend bisa kosong; data riil ada di HP |
+| AI response format | `application/json` (Structured) | Mencegah halusinasi, memungkinkan otomasi |
+| Category validation | Inject daftar valid ke prompt | AI hanya bisa memilih category_id yang ada |
+| Tunneling | Cloudflared | Gratis, stabil, tidak butuh autentikasi |
+| No user auth | Single-user offline app | Satu HP = satu user, tidak perlu login |
+
+---
+
+## 15. Catatan Penting
+
+> [!WARNING]
+> **Cloudflared URL berubah setiap kali tunnel di-restart.** URL di `api_client.dart` harus di-update manual dan APK harus di-rebuild setiap kali URL berubah.
+
+> [!NOTE]
+> **Dua modul `transaction` dan `transactions` ada di frontend.** Modul `transaction/` berisi BLoC + models + repository utama. Modul `transactions/` berisi datasource dan halaman list/add. Ini duplikasi yang terjadi secara organik dan perlu dikonsolidasi di refactor mendatang.
+
+> [!IMPORTANT]
+> **API Key Gemini di `.env` harus dirahasiakan.** File `.env` sudah di-*gitignore* tetapi pastikan tidak ter-push ke repository publik.
