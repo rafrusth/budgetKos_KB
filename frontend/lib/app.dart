@@ -8,6 +8,7 @@ import 'features/transaction/presentation/bloc/transaction_event.dart';
 import 'package:toastification/toastification.dart';
 import 'core/widgets/network_aware_widget.dart';
 import 'core/widgets/pin_protection_widget.dart';
+import 'core/theme/theme_cubit.dart';
 
 class BudgetKosApp extends StatelessWidget {
   const BudgetKosApp({super.key});
@@ -21,17 +22,24 @@ class BudgetKosApp extends StatelessWidget {
             repository: TransactionRepository(),
           )..add(FetchTransactions()),
         ),
+        BlocProvider<ThemeCubit>(
+          create: (context) => ThemeCubit(),
+        ),
       ],
       child: ToastificationWrapper(
-        child: MaterialApp.router(
-          title: 'BudgetKos AI',
-          theme: AppTheme.lightTheme,
-          darkTheme: AppTheme.darkTheme,
-          themeMode: ThemeMode.system,
-          routerConfig: appRouter,
-          builder: (context, child) => NetworkAwareWidget(
-            child: PinProtectionWidget(child: child ?? const SizedBox()),
-          ),
+        child: BlocBuilder<ThemeCubit, ThemeMode>(
+          builder: (context, themeMode) {
+            return MaterialApp.router(
+              title: 'BudgetKos AI',
+              theme: AppTheme.lightTheme,
+              darkTheme: AppTheme.darkTheme,
+              themeMode: themeMode,
+              routerConfig: appRouter,
+              builder: (context, child) => NetworkAwareWidget(
+                child: PinProtectionWidget(child: child ?? const SizedBox()),
+              ),
+            );
+          },
         ),
       ),
     );

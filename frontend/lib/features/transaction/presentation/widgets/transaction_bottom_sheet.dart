@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -118,16 +119,17 @@ class _TransactionBottomSheetState extends State<TransactionBottomSheet> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    return Container(
+    Widget content = Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: theme.colorScheme.background,
+        color: isDark ? Colors.black.withOpacity(0.4) : theme.scaffoldBackgroundColor,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        border: Border(top: BorderSide(color: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.05))),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
           Center(
             child: Container(
               width: 40,
@@ -284,9 +286,21 @@ class _TransactionBottomSheetState extends State<TransactionBottomSheet> {
         ],
       ),
     );
+
+    if (isDark) {
+      content = BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 15.0, sigmaY: 15.0),
+        child: content,
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+      child: content,
+    );
   }
 
-  Widget _typeButton(ThemeData theme, String title, String type, bool isDark) {
+  Widget _typeButton(ThemeData theme, String label, String type, bool isDark) {
     final isSelected = _selectedType == type;
     final color = type == 'income' ? theme.colorScheme.primary : theme.colorScheme.secondary;
 
@@ -310,7 +324,7 @@ class _TransactionBottomSheetState extends State<TransactionBottomSheet> {
         ),
         alignment: Alignment.center,
         child: Text(
-          title,
+          label,
           style: TextStyle(
             color: isSelected ? color : (isDark ? Colors.white70 : Colors.black54),
             fontWeight: FontWeight.bold,

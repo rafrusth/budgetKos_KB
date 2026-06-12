@@ -7,10 +7,18 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+type ChatHistoryItem struct {
+	Prompt   string `json:"prompt"`
+	Response string `json:"response"`
+}
+
 type LocalContext struct {
-	TotalIncome        float64                  `json:"total_income"`
-	TotalExpense       float64                  `json:"total_expense"`
-	RecentTransactions []map[string]interface{} `json:"recent_transactions"`
+	TotalIncome          float64                  `json:"total_income"`
+	TotalExpense         float64                  `json:"total_expense"`
+	RecentTransactions   []map[string]interface{} `json:"recent_transactions"`
+	CampusLocation       string                   `json:"campus_location"`
+	DaysRemainingInMonth int                      `json:"days_remaining_in_month"`
+	ChatHistory          []ChatHistoryItem        `json:"chat_history"`
 }
 
 type ChatRequest struct {

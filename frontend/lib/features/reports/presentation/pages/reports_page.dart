@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -49,7 +50,7 @@ class _ReportsPageState extends State<ReportsPage> {
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.background,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text("Laporan Keuangan", style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.transparent,
@@ -227,8 +228,23 @@ class _ReportsPageState extends State<ReportsPage> {
             ))
           else ...[
             SizedBox(
-              height: 250,
-              child: _buildChart(categoryTotals, expenseTxForChart, colors, totalExpense),
+              height: 280,
+              child: _selectedChart == ChartType.pie
+                  ? Stack(
+                      children: [
+                        _buildChart(categoryTotals, expenseTxForChart, colors, totalExpense),
+                        Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text("Total", style: TextStyle(fontSize: 14, color: Colors.grey)),
+                              Text("Rp ${_formatMoney(totalExpense)}", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    )
+                  : _buildChart(categoryTotals, expenseTxForChart, colors, totalExpense),
             ),
             const SizedBox(height: 24),
             Container(
@@ -310,8 +326,8 @@ class _ReportsPageState extends State<ReportsPage> {
               });
             },
           ),
-          sectionsSpace: 2,
-          centerSpaceRadius: 50,
+          sectionsSpace: 4,
+          centerSpaceRadius: 75,
           sections: pieSections,
         ),
       );
@@ -327,9 +343,18 @@ class _ReportsPageState extends State<ReportsPage> {
             barRods: [
               BarChartRodData(
                 toY: amount,
-                color: colors[index % colors.length],
-                width: 22,
-                borderRadius: BorderRadius.circular(4),
+                gradient: LinearGradient(
+                  colors: [colors[index % colors.length].withOpacity(0.5), colors[index % colors.length]],
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                ),
+                width: 24,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+                backDrawRodData: BackgroundBarChartRodData(
+                  show: true,
+                  toY: categoryTotals.values.reduce((a, b) => a > b ? a : b),
+                  color: Colors.grey.withOpacity(0.1),
+                ),
               )
             ],
           )
@@ -366,10 +391,12 @@ class _ReportsPageState extends State<ReportsPage> {
           borderData: FlBorderData(show: false),
           barTouchData: BarTouchData(
             touchTooltipData: BarTouchTooltipData(
+              getTooltipColor: (group) => Colors.black87,
+              tooltipRoundedRadius: 8,
               getTooltipItem: (group, groupIndex, rod, rodIndex) {
                 return BarTooltipItem(
                   'Rp ${_formatMoney(rod.toY)}',
-                  const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
                 );
               }
             )
@@ -430,7 +457,14 @@ class _ReportsPageState extends State<ReportsPage> {
             barWidth: 3,
             isStrokeCapRound: true,
             dotData: const FlDotData(show: false),
-            belowBarData: BarAreaData(show: false),
+            belowBarData: BarAreaData(
+              show: true,
+              gradient: LinearGradient(
+                colors: [color.withOpacity(0.4), color.withOpacity(0.0)],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+            ),
           )
         );
         colorIndex++;
@@ -462,11 +496,13 @@ class _ReportsPageState extends State<ReportsPage> {
           borderData: FlBorderData(show: false),
           lineTouchData: LineTouchData(
             touchTooltipData: LineTouchTooltipData(
+              getTooltipColor: (spot) => const Color(0xFF1E1E2C),
+              tooltipRoundedRadius: 8,
               getTooltipItems: (touchedSpots) {
                 return touchedSpots.map((spot) {
                   return LineTooltipItem(
                     'Rp ${_formatMoney(spot.y)}',
-                    const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
                   );
                 }).toList();
               }
@@ -574,12 +610,14 @@ class _ReportsPageState extends State<ReportsPage> {
         return StatefulBuilder(
           builder: (context, setModalState) {
             final theme = Theme.of(context);
+            final isDark = theme.brightness == Brightness.dark;
             
-            return Container(
+            Widget content = Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: theme.colorScheme.background,
+                color: isDark ? Colors.black.withOpacity(0.4) : theme.scaffoldBackgroundColor,
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+                border: Border(top: BorderSide(color: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.05))),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -713,9 +751,21 @@ class _ReportsPageState extends State<ReportsPage> {
                 ],
               ),
             );
-          }
+
+            if (isDark) {
+              content = BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 15.0, sigmaY: 15.0),
+                child: content,
+              );
+            }
+
+            return ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+              child: content,
+            );
+          },
         );
-      }
+      },
     );
   }
   Widget _buildAdvancedAnalysisCard(BuildContext context, TransactionLoaded state, double totalExpense) {
@@ -728,44 +778,52 @@ class _ReportsPageState extends State<ReportsPage> {
     
     final bool isDanger = estimatedDaysLeft < (DateTime(now.year, now.month + 1, 0).day - now.day);
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.colorScheme.primary.withOpacity(0.2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.analytics, color: theme.colorScheme.primary, size: 20),
-              const SizedBox(width: 8),
-              Text("Ringkasan Analisis", style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.primary, fontSize: 16)),
+    Widget buildMiniCard(String title, String value, IconData icon, Color color, {String? trendText}) {
+      return Expanded(
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: theme.cardColor,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2)),
             ],
+            border: Border.all(color: Colors.grey.withOpacity(0.1)),
           ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("Rata-rata Harian:", style: TextStyle(fontSize: 13)),
-              Text("Rp ${_formatMoney(avgDaily)}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text("Estimasi Sisa Uang:", style: TextStyle(fontSize: 13)),
-              Text(
-                estimatedDaysLeft > 100 ? "Aman (> 3 bln)" : "$estimatedDaysLeft Hari lagi", 
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isDanger ? Colors.red : Colors.green)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(child: Text(title, style: const TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis)),
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
+                    child: Icon(icon, size: 14, color: color),
+                  )
+                ],
               ),
+              const SizedBox(height: 8),
+              Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+              if (trendText != null) ...[
+                const SizedBox(height: 4),
+                Text(trendText, style: TextStyle(fontSize: 10, color: trendText.contains('Bahaya') || trendText.contains('Hari') && isDanger ? Colors.red : Colors.green, fontWeight: FontWeight.w600)),
+              ]
             ],
           ),
-        ],
-      ),
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        buildMiniCard("Pengeluaran", "Rp ${_formatMoney(totalExpense)}", Icons.shopping_bag_outlined, Colors.orange),
+        const SizedBox(width: 8),
+        buildMiniCard("Rata-rata", "Rp ${_formatMoney(avgDaily)}/hr", Icons.show_chart, Colors.blue),
+        const SizedBox(width: 8),
+        buildMiniCard("Sisa Uang", estimatedDaysLeft > 100 ? "> 3 bln" : "$estimatedDaysLeft Hari", Icons.account_balance_wallet_outlined, Colors.teal, trendText: isDanger ? "Bahaya" : "Aman"),
+      ],
     );
   }
 }

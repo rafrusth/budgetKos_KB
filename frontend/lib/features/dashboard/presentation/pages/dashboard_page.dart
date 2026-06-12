@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:go_router/go_router.dart' as import_router;
@@ -97,82 +98,96 @@ class _DashboardPageState extends State<DashboardPage> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: theme.scaffoldBackgroundColor,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.withOpacity(0.3),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
+        final isDark = theme.brightness == Brightness.dark;
+        Widget content = Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: isDark ? Colors.black.withOpacity(0.4) : theme.scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+            border: Border(top: BorderSide(color: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.05))),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                const SizedBox(height: 24),
-                Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 24),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
-                  children: [
-                    Text('Rp ', style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold, color: Colors.grey)),
-                    Expanded(
-                      child: TextField(
-                        controller: controller,
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                          CurrencyInputFormatter(),
-                        ],
-                        style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
-                        decoration: const InputDecoration(
-                          hintText: '0',
-                          border: InputBorder.none,
-                          isDense: true,
-                          contentPadding: EdgeInsets.zero,
-                        ),
+              ),
+              const SizedBox(height: 24),
+              Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 24),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text('Rp ', style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold, color: Colors.grey)),
+                  Expanded(
+                    child: TextField(
+                      controller: controller,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        CurrencyInputFormatter(),
+                      ],
+                      style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+                      decoration: const InputDecoration(
+                        hintText: '0',
+                        border: InputBorder.none,
+                        isDense: true,
+                        contentPadding: EdgeInsets.zero,
                       ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 32),
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: theme.colorScheme.primary,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    ),
-                    onPressed: () {
-                      final cleanText = controller.text.replaceAll(RegExp(r'[^\d]'), '');
-                      final val = double.tryParse(cleanText);
-                      if (val != null && val > 0) {
-                        onSave(val);
-                      }
-                      Navigator.pop(context);
-                    },
-                    child: const Text('Simpan Target', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   ),
+                ],
+              ),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: theme.colorScheme.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                  onPressed: () {
+                    final cleanText = controller.text.replaceAll(RegExp(r'[^\d]'), '');
+                    final val = double.tryParse(cleanText);
+                    if (val != null && val > 0) {
+                      onSave(val);
+                    }
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Simpan Target', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 ),
-                const SizedBox(height: 16),
-              ],
-            ),
+              ),
+              const SizedBox(height: 16),
+            ],
           ),
         );
-      }
+
+        if (isDark) {
+          content = BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 15.0, sigmaY: 15.0),
+            child: content,
+          );
+        }
+
+        return Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+          child: ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+            child: content,
+          ),
+        );
+      },
     );
   }
 
@@ -182,8 +197,7 @@ class _DashboardPageState extends State<DashboardPage> {
     final isDark = theme.brightness == Brightness.dark;
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      body: SafeArea(
-        child: BlocConsumer<TransactionBloc, TransactionState>(
+      body: BlocConsumer<TransactionBloc, TransactionState>(
           listener: (context, state) {
             if (state is TransactionLoaded) {
               final double expense = state.totalExpense;
@@ -218,7 +232,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 },
                 child: SingleChildScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(vertical: 16.0),
+                  padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 16, bottom: 16.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -248,7 +262,6 @@ class _DashboardPageState extends State<DashboardPage> {
             return const SizedBox();
           },
         ),
-      ),
     );
   }
 
