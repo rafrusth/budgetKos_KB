@@ -146,13 +146,9 @@ class _TransactionBottomSheetState extends State<TransactionBottomSheet> {
             ),
           Row(
             children: [
-              Expanded(
-                child: _typeButton('Pengeluaran', 'expense', isDark),
-              ),
+              Expanded(child: _typeButton(theme, 'Pengeluaran', 'expense', isDark)),
               const SizedBox(width: 16),
-              Expanded(
-                child: _typeButton('Pemasukan', 'income', isDark),
-              ),
+              Expanded(child: _typeButton(theme, 'Pemasukan', 'income', isDark)),
             ],
           ),
           const SizedBox(height: 24),
@@ -194,6 +190,36 @@ class _TransactionBottomSheetState extends State<TransactionBottomSheet> {
               ),
             ),
           ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Tanggal', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+              TextButton.icon(
+                onPressed: () async {
+                  final date = await showDatePicker(
+                    context: context,
+                    initialDate: _selectedDate,
+                    firstDate: DateTime(2000),
+                    lastDate: DateTime(2100),
+                  );
+                  if (date != null) {
+                    setState(() {
+                      _selectedDate = date;
+                    });
+                  }
+                },
+                icon: const Icon(Icons.calendar_today, size: 16),
+                label: Text('${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                style: TextButton.styleFrom(
+                  backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
+                  foregroundColor: theme.colorScheme.primary,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 24),
           Text('Kategori', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
@@ -228,10 +254,10 @@ class _TransactionBottomSheetState extends State<TransactionBottomSheet> {
                       );
                     }),
                     ActionChip(
-                      label: const Text('+ Kategori Baru', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
-                      backgroundColor: Colors.blue.withOpacity(0.1),
+                      label: Text('+ Kategori Baru', style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold)),
+                      backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide.none),
-                      onPressed: () => _showAddCategoryDialog(context),
+                      onPressed: () => _showAddCategoryDialog(context, theme),
                     ),
                   ],
                 );
@@ -260,9 +286,9 @@ class _TransactionBottomSheetState extends State<TransactionBottomSheet> {
     );
   }
 
-  Widget _typeButton(String title, String type, bool isDark) {
+  Widget _typeButton(ThemeData theme, String title, String type, bool isDark) {
     final isSelected = _selectedType == type;
-    final color = type == 'income' ? Colors.green : Colors.orange;
+    final color = type == 'income' ? theme.colorScheme.primary : theme.colorScheme.secondary;
 
     return InkWell(
       onTap: () {
@@ -294,7 +320,7 @@ class _TransactionBottomSheetState extends State<TransactionBottomSheet> {
     );
   }
 
-  void _showAddCategoryDialog(BuildContext context) {
+  void _showAddCategoryDialog(BuildContext context, ThemeData theme) {
     final TextEditingController newCatController = TextEditingController();
     showDialog(
       context: context,
@@ -323,9 +349,10 @@ class _TransactionBottomSheetState extends State<TransactionBottomSheet> {
               },
               style: ElevatedButton.styleFrom(
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                backgroundColor: Colors.blue,
+                backgroundColor: theme.colorScheme.primary,
+                foregroundColor: theme.colorScheme.onPrimary,
               ),
-              child: const Text('Simpan', style: TextStyle(color: Colors.white)),
+              child: const Text('Simpan', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
           ],
         );

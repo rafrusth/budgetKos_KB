@@ -180,30 +180,41 @@ class _ReportsPageState extends State<ReportsPage> {
       colorIndex++;
     });
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.only(left: 20, right: 20, top: 20, bottom: 120),
+    return RefreshIndicator(
+      onRefresh: () async {
+        context.read<TransactionBloc>().add(FetchTransactions());
+      },
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.only(left: 20, right: 20, top: 20, bottom: 120),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          _buildAdvancedAnalysisCard(context, state, totalExpense),
+          const SizedBox(height: 24),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text("Distribusi Pengeluaran", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              SegmentedButton<ChartType>(
-                segments: const [
-                  ButtonSegment(value: ChartType.pie, icon: Icon(Icons.pie_chart)),
-                  ButtonSegment(value: ChartType.bar, icon: Icon(Icons.bar_chart)),
-                  ButtonSegment(value: ChartType.line, icon: Icon(Icons.show_chart)),
-                ],
-                selected: {_selectedChart},
-                onSelectionChanged: (Set<ChartType> newSelection) {
-                  setState(() {
-                    _selectedChart = newSelection.first;
-                  });
-                },
-                showSelectedIcon: false,
-                style: const ButtonStyle(
-                  visualDensity: VisualDensity.compact,
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: SegmentedButton<ChartType>(
+                  segments: const [
+                    ButtonSegment(value: ChartType.pie, icon: Icon(Icons.pie_chart), label: Text("Pie")),
+                    ButtonSegment(value: ChartType.bar, icon: Icon(Icons.bar_chart), label: Text("Bar")),
+                    ButtonSegment(value: ChartType.line, icon: Icon(Icons.show_chart), label: Text("Line")),
+                  ],
+                  selected: {_selectedChart},
+                  onSelectionChanged: (Set<ChartType> newSelection) {
+                    setState(() {
+                      _selectedChart = newSelection.first;
+                    });
+                  },
+                  showSelectedIcon: false,
+                  style: const ButtonStyle(
+                    visualDensity: VisualDensity.compact,
+                  ),
                 ),
               ),
             ],
@@ -254,7 +265,7 @@ class _ReportsPageState extends State<ReportsPage> {
           _buildAllTransactions(listFiltered, theme), // Pass ONLY listFiltered here
         ],
       ),
-    );
+    ));
   }
 
   Widget _buildChart(Map<String, double> categoryTotals, List<TransactionModel> expenseTx, List<Color> colors, double totalExpense) {
@@ -485,7 +496,7 @@ class _ReportsPageState extends State<ReportsPage> {
         itemBuilder: (context, index) {
           final tx = transactions[index];
           final isIncome = tx.type == 'income';
-          final color = isIncome ? Colors.green : Colors.orange;
+          final color = isIncome ? theme.colorScheme.primary : theme.colorScheme.secondary;
           final sign = isIncome ? '+' : '-';
           
           return Dismissible(
@@ -705,6 +716,56 @@ class _ReportsPageState extends State<ReportsPage> {
           }
         );
       }
+    );
+  }
+  Widget _buildAdvancedAnalysisCard(BuildContext context, TransactionLoaded state, double totalExpense) {
+    final theme = Theme.of(context);
+    final now = DateTime.now();
+    final daysElapsed = now.day;
+    final avgDaily = totalExpense / daysElapsed;
+    final sisaSaldo = state.balance;
+    final estimatedDaysLeft = avgDaily > 0 ? (sisaSaldo / avgDaily).floor() : 999;
+    
+    final bool isDanger = estimatedDaysLeft < (DateTime(now.year, now.month + 1, 0).day - now.day);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.colorScheme.primary.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.analytics, color: theme.colorScheme.primary, size: 20),
+              const SizedBox(width: 8),
+              Text("Ringkasan Analisis", style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.primary, fontSize: 16)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text("Rata-rata Harian:", style: TextStyle(fontSize: 13)),
+              Text("Rp ${_formatMoney(avgDaily)}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text("Estimasi Sisa Uang:", style: TextStyle(fontSize: 13)),
+              Text(
+                estimatedDaysLeft > 100 ? "Aman (> 3 bln)" : "$estimatedDaysLeft Hari lagi", 
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isDanger ? Colors.red : Colors.green)
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

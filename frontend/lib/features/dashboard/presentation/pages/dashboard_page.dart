@@ -10,6 +10,8 @@ import '../../../transaction/presentation/bloc/transaction_event.dart';
 import '../../../transaction/presentation/widgets/transaction_bottom_sheet.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../transaction/data/models/transaction_model.dart';
+import '../../../../core/utils/currency_formatter.dart';
+import 'package:flutter/services.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -20,6 +22,8 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage> {
   double _monthlyBudget = 2000000; // Default Rp 2.000.000
+  double _incomeTarget = 3000000; // Default Rp 3.000.000
+  bool _hasShownWarning = false;
   String _userName = 'Mahasiswa';
   String _userEmail = '@anak_kos';
 
@@ -33,6 +37,7 @@ class _DashboardPageState extends State<DashboardPage> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _monthlyBudget = prefs.getDouble('monthly_budget') ?? 2000000;
+      _incomeTarget = prefs.getDouble('income_target') ?? 3000000;
       _userName = prefs.getString('user_name') ?? 'Mahasiswa';
       
       final email = prefs.getString('user_email') ?? 'anak_kos@university.edu';
@@ -49,35 +54,125 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _showSetBudgetDialog(BuildContext context) {
-    final TextEditingController controller = TextEditingController(text: _monthlyBudget.toInt().toString());
-    showDialog(
+    _showEditTargetBottomSheet(
       context: context,
+      title: 'Atur Target Pengeluaran',
+      initialValue: _monthlyBudget,
+      onSave: (val) => _saveBudget(val),
+    );
+  }
+
+  void _updateIncomeTarget(double newTarget) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('income_target', newTarget);
+    setState(() {
+      _incomeTarget = newTarget;
+    });
+  }
+
+  void _showEditIncomeDialog() {
+    _showEditTargetBottomSheet(
+      context: context,
+      title: 'Atur Target Pemasukan',
+      initialValue: _incomeTarget,
+      onSave: (val) => _updateIncomeTarget(val),
+    );
+  }
+
+  void _showEditTargetBottomSheet({required BuildContext context, required String title, required double initialValue, required Function(double) onSave}) {
+    final theme = Theme.of(context);
+    final controller = TextEditingController(text: initialValue.toInt().toString());
+    
+    // Apply initial formatting
+    if (controller.text.isNotEmpty) {
+      controller.text = CurrencyInputFormatter().formatEditUpdate(
+        const TextEditingValue(text: ''), 
+        TextEditingValue(text: controller.text)
+      ).text;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      useRootNavigator: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (context) {
-        return AlertDialog(
-          title: const Text("Atur Target Pengeluaran"),
-          content: TextField(
-            controller: controller,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              prefixText: 'Rp ',
-              hintText: 'Misal: 2000000',
+        return Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: theme.scaffoldBackgroundColor,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 24),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text('Rp ', style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold, color: Colors.grey)),
+                    Expanded(
+                      child: TextField(
+                        controller: controller,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          CurrencyInputFormatter(),
+                        ],
+                        style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+                        decoration: const InputDecoration(
+                          hintText: '0',
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 32),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.colorScheme.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    onPressed: () {
+                      final cleanText = controller.text.replaceAll(RegExp(r'[^\d]'), '');
+                      final val = double.tryParse(cleanText);
+                      if (val != null && val > 0) {
+                        onSave(val);
+                      }
+                      Navigator.pop(context);
+                    },
+                    child: const Text('Simpan Target', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
             ),
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Batal")),
-            ElevatedButton(
-              onPressed: () {
-                final val = double.tryParse(controller.text.replaceAll(RegExp(r'[^0-9]'), ''));
-                if (val != null && val > 0) {
-                  _saveBudget(val);
-                }
-                Navigator.pop(context);
-              },
-              child: const Text("Simpan"),
-            )
-          ],
         );
-      },
+      }
     );
   }
 
@@ -85,38 +180,66 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final bgColor = isDark ? theme.colorScheme.background : const Color(0xFFF7F7F0); 
-    
     return Scaffold(
-      backgroundColor: bgColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
-        child: BlocBuilder<TransactionBloc, TransactionState>(
+        child: BlocConsumer<TransactionBloc, TransactionState>(
+          listener: (context, state) {
+            if (state is TransactionLoaded) {
+              final double expense = state.totalExpense;
+              final double progress = _monthlyBudget > 0 ? expense / _monthlyBudget : 0;
+              if (progress >= 0.8 && !_hasShownWarning) {
+                _hasShownWarning = true;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Row(
+                      children: [
+                        const Icon(Icons.warning_amber_rounded, color: Colors.white),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text('Peringatan: Pengeluaran Anda sudah mencapai ${(progress*100).toStringAsFixed(0)}% dari batas anggaran!')),
+                      ],
+                    ),
+                    backgroundColor: Colors.redAccent,
+                    behavior: SnackBarBehavior.floating,
+                    duration: const Duration(seconds: 5),
+                  ),
+                );
+              }
+            }
+          },
           builder: (context, state) {
             if (state is TransactionLoading || state is TransactionInitial) {
               return const Center(child: CircularProgressIndicator());
             } else if (state is TransactionLoaded) {
-              return SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildHeader(theme),
-                    const SizedBox(height: 30),
-                    _buildBalanceCard(theme, state),
-                    const SizedBox(height: 24),
-                    _buildBudgetCard(theme, state),
-                    const SizedBox(height: 32),
-                    _buildSectionTitle(theme, 'Quick Stats', ''),
-                    const SizedBox(height: 16),
-                    _buildQuickStats(context, theme, state),
-                    const SizedBox(height: 32),
-                    _buildSectionTitle(theme, 'Recent Transactions', 'See all', onActionTap: () {
-                      import_router.GoRouter.of(context).go('/reports');
-                    }),
-                    const SizedBox(height: 16),
-                    _buildRecentTransactions(context, theme, state),
-                    const SizedBox(height: 100), // padding for bottom nav
-                  ],
+              return RefreshIndicator(
+                onRefresh: () async {
+                  context.read<TransactionBloc>().add(FetchTransactions());
+                  await _loadProfileAndBudget();
+                },
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(vertical: 16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(padding: const EdgeInsets.symmetric(horizontal: 24.0), child: _buildHeader(theme)),
+                      const SizedBox(height: 30),
+                      Padding(padding: const EdgeInsets.symmetric(horizontal: 24.0), child: _buildBalanceCard(theme, state)),
+                      const SizedBox(height: 24),
+                      Padding(padding: const EdgeInsets.symmetric(horizontal: 24.0), child: _buildBudgetCard(theme, state)),
+                      const SizedBox(height: 32),
+                      Padding(padding: const EdgeInsets.symmetric(horizontal: 24.0), child: _buildSectionTitle(theme, 'Quick Stats', '')),
+                      const SizedBox(height: 16),
+                      _buildQuickStats(context, theme, state),
+                      const SizedBox(height: 32),
+                      Padding(padding: const EdgeInsets.symmetric(horizontal: 24.0), child: _buildSectionTitle(theme, 'Recent Transactions', 'See all', onActionTap: () {
+                        import_router.GoRouter.of(context).go('/reports');
+                      })),
+                      const SizedBox(height: 16),
+                      Padding(padding: const EdgeInsets.symmetric(horizontal: 24.0), child: _buildRecentTransactions(context, theme, state)),
+                      const SizedBox(height: 100), // padding for bottom nav
+                    ],
+                  ),
                 ),
               );
             } else if (state is TransactionError) {
@@ -149,15 +272,24 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _buildBalanceCard(ThemeData theme, TransactionLoaded state) {
+    final now = DateTime.now();
+    final lastDay = DateTime(now.year, now.month + 1, 0);
+    final totalDays = lastDay.day;
+    final currentDay = now.day;
+    final progress = currentDay / totalDays;
+    
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    final monthName = months[now.month - 1];
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFCC66), // Yellow/Orange card from image
+        color: theme.colorScheme.tertiary, // Light Blue Card
         borderRadius: BorderRadius.circular(32),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFFFCC66).withOpacity(0.4),
+            color: theme.colorScheme.tertiary.withOpacity(0.4),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -185,21 +317,23 @@ class _DashboardPageState extends State<DashboardPage> {
           Text('Rp ${_formatMoney(state.balance)}', style: theme.textTheme.headlineLarge?.copyWith(color: Colors.black, fontWeight: FontWeight.w900)),
           const SizedBox(height: 8),
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Icon(Icons.fiber_manual_record, size: 8, color: Colors.black87),
-              const SizedBox(width: 8),
-              Text('Bulan Ini', style: theme.textTheme.bodyMedium?.copyWith(color: Colors.black87, fontWeight: FontWeight.w500)),
+              Text("1 $monthName", style: const TextStyle(color: Colors.black54, fontSize: 12)),
+              Text("Hari ini ($currentDay)", style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 12)),
+              Text("${lastDay.day} $monthName", style: const TextStyle(color: Colors.black54, fontSize: 12)),
             ],
           ),
-          const SizedBox(height: 24),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.4),
-              borderRadius: BorderRadius.circular(20),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: progress,
+              backgroundColor: Colors.white.withOpacity(0.5),
+              valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.secondary),
+              minHeight: 6,
             ),
-            child: Text('Data Riil', style: theme.textTheme.bodySmall?.copyWith(color: Colors.black87, fontWeight: FontWeight.bold)),
-          )
+          ),
         ],
       ),
     );
@@ -351,170 +485,236 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
+  List<FlSpot> _generateChartData(List<TransactionModel> transactions, ChartFilterType filterType) {
+    if (transactions.isEmpty) return [const FlSpot(0, 0)];
+
+    final sortedTx = List<TransactionModel>.from(transactions)..sort((a, b) => a.date.compareTo(b.date));
+    
+    Map<int, double> groupedData = {};
+    double runningBalance = 0;
+
+    for (var tx in sortedTx) {
+      final dateObj = tx.date.toLocal();
+      final dayStart = DateTime(dateObj.year, dateObj.month, dateObj.day);
+      final int dayKey = dayStart.millisecondsSinceEpoch ~/ 86400000;
+
+      if (tx.type == 'income') runningBalance += tx.amount;
+      if (tx.type == 'expense') runningBalance -= tx.amount;
+
+      switch (filterType) {
+        case ChartFilterType.income:
+          if (tx.type == 'income') {
+            groupedData[dayKey] = (groupedData[dayKey] ?? 0) + tx.amount;
+          } else {
+            groupedData.putIfAbsent(dayKey, () => 0);
+          }
+          break;
+        case ChartFilterType.expense:
+          if (tx.type == 'expense') {
+            groupedData[dayKey] = (groupedData[dayKey] ?? 0) + tx.amount;
+          } else {
+            groupedData.putIfAbsent(dayKey, () => 0);
+          }
+          break;
+        case ChartFilterType.balance:
+          groupedData[dayKey] = runningBalance;
+          break;
+      }
+    }
+
+    List<FlSpot> spots = groupedData.entries.map((e) {
+      return FlSpot(e.key.toDouble(), e.value);
+    }).toList();
+
+    spots.sort((a, b) => a.x.compareTo(b.x));
+
+    if (spots.isEmpty) return [const FlSpot(0, 0)];
+    return spots;
+  }
+
   Widget _buildQuickStats(BuildContext context, ThemeData theme, TransactionLoaded state) {
     final isDark = theme.brightness == Brightness.dark;
     
-    // Calculate progress roughly for visualization
-    double maxAmount = state.totalIncome > state.totalExpense ? state.totalIncome : state.totalExpense;
-    if (maxAmount == 0) maxAmount = 1; // prevent division by zero
-    double incomeProgress = state.totalIncome / maxAmount;
-    double expenseProgress = state.totalExpense / maxAmount;
+    double incomeProgress = _incomeTarget > 0 ? state.totalIncome / _incomeTarget : 0;
+    double expenseProgress = _monthlyBudget > 0 ? state.totalExpense / _monthlyBudget : 0;
 
     return Column(
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: _statCard(theme, 'Pemasukan', 'Rp ${_formatMoney(state.totalIncome)}', Colors.green, incomeProgress),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: _statCard(theme, 'Pengeluaran', 'Rp ${_formatMoney(state.totalExpense)}', Colors.orange, expenseProgress),
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: theme.cardColor,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 5),
-              ),
-            ],
-          ),
-          child: Column(
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+          child: Row(
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _filterChip(context, theme, 'Pemasukan', ChartFilterType.income, state.chartFilter),
-                  _filterChip(context, theme, 'Pengeluaran', ChartFilterType.expense, state.chartFilter),
-                  _filterChip(context, theme, 'Saldo', ChartFilterType.balance, state.chartFilter),
-                ],
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                height: 220,
-                child: LineChart(
-                  LineChartData(
-                    lineTouchData: LineTouchData(
-                      touchTooltipData: LineTouchTooltipData(
-                        getTooltipItems: (touchedSpots) {
-                          return touchedSpots.map((spot) {
-                            final amountText = 'Rp ${_formatMoney(spot.y)}';
-                            final date = DateTime.fromMillisecondsSinceEpoch(spot.x.toInt() * 86400000);
-                            
-                            String title = "Total (${date.day}/${date.month})";
-                            
-                            if (state.chartFilter == ChartFilterType.balance) {
-                              title = 'Saldo (${date.day}/${date.month})';
-                            } else if (state.chartFilter == ChartFilterType.income) {
-                              title = 'Pemasukan (${date.day}/${date.month})';
-                            } else if (state.chartFilter == ChartFilterType.expense) {
-                              title = 'Pengeluaran (${date.day}/${date.month})';
-                            }
-                            
-                            return LineTooltipItem(
-                              '$title\n',
-                              TextStyle(color: isDark ? Colors.white70 : Colors.black54, fontSize: 12),
-                              children: [
-                                TextSpan(
-                                  text: amountText,
-                                  style: TextStyle(
-                                    color: _getChartColor(state.chartFilter),
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                            );
-                          }).toList();
-                        },
-                      ),
-                    ),
-                    gridData: FlGridData(
-                      show: true,
-                      drawVerticalLine: false,
-                      getDrawingHorizontalLine: (value) => FlLine(
-                        color: Colors.grey.withOpacity(0.1),
-                        strokeWidth: 1,
-                      ),
-                    ),
-                    titlesData: FlTitlesData(
-                      show: true,
-                      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      bottomTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          reservedSize: 30,
-                          interval: 1,
-                          getTitlesWidget: (value, meta) {
-                            final date = DateTime.fromMillisecondsSinceEpoch(value.toInt() * 86400000);
-                            return SideTitleWidget(
-                              meta: meta,
-                              child: Text("${date.day}/${date.month}", style: theme.textTheme.labelSmall?.copyWith(fontSize: 10, color: Colors.grey)),
-                            );
-                          },
-                        ),
-                      ),
-                      leftTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          reservedSize: 45,
-                          getTitlesWidget: (value, meta) {
-                            if (value == meta.max && value != 0) return const SizedBox.shrink();
-                            String text;
-                            if (value.abs() >= 1000000) {
-                              text = '${(value / 1000000).toStringAsFixed(1)}Jt';
-                            } else if (value.abs() >= 1000) {
-                              text = '${(value / 1000).toStringAsFixed(0)}K';
-                            } else {
-                              text = value.toStringAsFixed(0);
-                            }
-                            return SideTitleWidget(
-                              meta: meta,
-                              child: Text(text, style: theme.textTheme.labelSmall?.copyWith(fontSize: 10, color: Colors.grey)),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                    borderData: FlBorderData(show: false),
-                    lineBarsData: [
-                      LineChartBarData(
-                        spots: state.chartData,
-                        isCurved: true,
-                        color: _getChartColor(state.chartFilter),
-                        barWidth: 4,
-                        isStrokeCapRound: true,
-                        dotData: const FlDotData(show: false),
-                        belowBarData: BarAreaData(
-                          show: true,
-                          color: _getChartColor(state.chartFilter).withOpacity(0.2),
-                        ),
-                      ),
-                    ],
-                  ),
+              Expanded(
+                child: GestureDetector(
+                  onTap: _showEditIncomeDialog,
+                  child: _statCard(theme, 'Pemasukan', 'Rp ${_formatMoney(state.totalIncome)}', theme.colorScheme.primary, incomeProgress),
                 ),
               ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Total ${state.chartFilter.name}', style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey)),
-                  Text('Rp ${_getChartTotal(state)}', style: theme.textTheme.titleMedium?.copyWith(color: theme.textTheme.bodyLarge?.color, fontWeight: FontWeight.bold)),
-                ],
-              )
+              const SizedBox(width: 16),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => _showSetBudgetDialog(context), // Reuse edit budget for expense target
+                  child: _statCard(theme, 'Pengeluaran', 'Rp ${_formatMoney(state.totalExpense)}', theme.colorScheme.secondary, expenseProgress),
+                ),
+              ),
             ],
           ),
-        )
+        ),
+        const SizedBox(height: 24),
+        SizedBox(
+          height: MediaQuery.of(context).size.width * 0.85, // Make it roughly square based on viewportFraction
+          child: PageView(
+            controller: PageController(viewportFraction: 0.9),
+            padEnds: false,
+            children: [
+              _buildChartCard(theme, isDark, state, ChartFilterType.income, state.totalIncome, true),
+              _buildChartCard(theme, isDark, state, ChartFilterType.expense, state.totalExpense, false),
+              _buildChartCard(theme, isDark, state, ChartFilterType.balance, state.balance, false),
+            ],
+          ),
+        ),
       ],
+    );
+  }
+
+  Widget _buildChartCard(ThemeData theme, bool isDark, TransactionLoaded state, ChartFilterType type, double total, bool isFirst) {
+    final chartData = _generateChartData(state.transactions, type);
+    final String title = type == ChartFilterType.income ? "Pemasukan" : type == ChartFilterType.expense ? "Pengeluaran" : "Saldo";
+    
+    return Container(
+      margin: EdgeInsets.only(left: isFirst ? 24 : 8, right: 8),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: _getChartColor(theme, type).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Text(
+              "Grafik $title",
+              style: theme.textTheme.titleSmall?.copyWith(
+                color: _getChartColor(theme, type),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: LineChart(
+              LineChartData(
+                lineTouchData: LineTouchData(
+                  touchTooltipData: LineTouchTooltipData(
+                    getTooltipItems: (touchedSpots) {
+                      return touchedSpots.map((spot) {
+                        final amountText = 'Rp ${_formatMoney(spot.y)}';
+                        final date = DateTime.fromMillisecondsSinceEpoch(spot.x.toInt() * 86400000);
+                        return LineTooltipItem(
+                          '$title (${date.day}/${date.month})\n',
+                          TextStyle(color: isDark ? Colors.white70 : Colors.black54, fontSize: 12),
+                          children: [
+                            TextSpan(
+                              text: amountText,
+                              style: TextStyle(
+                                color: _getChartColor(theme, type),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        );
+                      }).toList();
+                    },
+                  ),
+                ),
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  getDrawingHorizontalLine: (value) => FlLine(
+                    color: Colors.grey.withOpacity(0.1),
+                    strokeWidth: 1,
+                  ),
+                ),
+                titlesData: FlTitlesData(
+                  show: true,
+                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 30,
+                      interval: 1,
+                      getTitlesWidget: (value, meta) {
+                        final date = DateTime.fromMillisecondsSinceEpoch(value.toInt() * 86400000);
+                        return SideTitleWidget(
+                          meta: meta,
+                          child: Text("${date.day}/${date.month}", style: theme.textTheme.labelSmall?.copyWith(fontSize: 10, color: Colors.grey)),
+                        );
+                      },
+                    ),
+                  ),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 45,
+                      getTitlesWidget: (value, meta) {
+                        if (value == meta.max && value != 0) return const SizedBox.shrink();
+                        String text;
+                        if (value.abs() >= 1000000) {
+                          text = '${(value / 1000000).toStringAsFixed(1)}Jt';
+                        } else if (value.abs() >= 1000) {
+                          text = '${(value / 1000).toStringAsFixed(0)}K';
+                        } else {
+                          text = value.toStringAsFixed(0);
+                        }
+                        return SideTitleWidget(
+                          meta: meta,
+                          child: Text(text, style: theme.textTheme.labelSmall?.copyWith(fontSize: 10, color: Colors.grey)),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                borderData: FlBorderData(show: false),
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: chartData,
+                    isCurved: true,
+                    color: _getChartColor(theme, type),
+                    barWidth: 4,
+                    isStrokeCapRound: true,
+                    dotData: const FlDotData(show: false),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      color: _getChartColor(theme, type).withOpacity(0.2),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Total $title', style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey)),
+              Text('Rp ${_formatMoney(total)}', style: theme.textTheme.titleMedium?.copyWith(color: theme.textTheme.bodyLarge?.color, fontWeight: FontWeight.bold)),
+            ],
+          )
+        ],
+      ),
     );
   }
 
@@ -554,17 +754,19 @@ class _DashboardPageState extends State<DashboardPage> {
           const SizedBox(height: 8),
           Text(amount, style: theme.textTheme.titleMedium?.copyWith(color: theme.textTheme.bodyLarge?.color, fontWeight: FontWeight.w800)),
           const SizedBox(height: 16),
-          // Progress bar representation
-          Row(
-            children: [
-              Text('0%', style: theme.textTheme.labelSmall?.copyWith(color: Colors.grey, fontSize: 10)),
-              const Spacer(),
-              Text('${(progress * 100).toInt()}%', style: theme.textTheme.labelSmall?.copyWith(color: Colors.grey, fontSize: 10)),
-              const Spacer(),
-              Text('100%', style: theme.textTheme.labelSmall?.copyWith(color: Colors.grey, fontSize: 10)),
-            ],
+          // Progress text on top
+          Align(
+            alignment: Alignment.centerRight,
+            child: Text(
+              '${(progress * 100).toInt()}%', 
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: color, 
+                fontWeight: FontWeight.w900,
+                fontSize: 14,
+              ),
+            ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Stack(
             children: [
               Container(
@@ -585,17 +787,25 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
               ),
             ],
-          )
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Text('0%', style: theme.textTheme.labelSmall?.copyWith(color: Colors.grey, fontSize: 10)),
+              const Spacer(),
+              Text('100%', style: theme.textTheme.labelSmall?.copyWith(color: Colors.grey, fontSize: 10)),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Color _getChartColor(ChartFilterType type) {
+  Color _getChartColor(ThemeData theme, ChartFilterType type) {
     switch (type) {
-      case ChartFilterType.income: return Colors.green;
-      case ChartFilterType.expense: return Colors.orange;
-      case ChartFilterType.balance: return Colors.blue;
+      case ChartFilterType.income: return theme.colorScheme.primary;
+      case ChartFilterType.expense: return theme.colorScheme.secondary;
+      case ChartFilterType.balance: return theme.colorScheme.tertiary;
     }
   }
 

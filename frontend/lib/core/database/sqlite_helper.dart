@@ -71,6 +71,27 @@ class SqliteHelper {
         timestamp TEXT NOT NULL
       )
     ''');
+    
+    // Seed default categories
+    final defaultCategories = [
+      {'name': 'Makanan', 'icon': 'restaurant', 'color': '#FF9800', 'type': 'expense'},
+      {'name': 'Transportasi', 'icon': 'directions_car', 'color': '#2196F3', 'type': 'expense'},
+      {'name': 'Tagihan', 'icon': 'receipt', 'color': '#F44336', 'type': 'expense'},
+      {'name': 'Belanja', 'icon': 'shopping_cart', 'color': '#9C27B0', 'type': 'expense'},
+      {'name': 'Gaji', 'icon': 'account_balance_wallet', 'color': '#4CAF50', 'type': 'income'},
+      {'name': 'Bonus', 'icon': 'card_giftcard', 'color': '#00BCD4', 'type': 'income'},
+    ];
+
+    for (var cat in defaultCategories) {
+      await db.insert('categories', {
+        'name': cat['name'],
+        'icon': cat['icon'],
+        'color': cat['color'],
+        'type': cat['type'],
+        'is_default': 1,
+        'sort_order': 0,
+      });
+    }
   }
 
   Future<void> clearAllData() async {

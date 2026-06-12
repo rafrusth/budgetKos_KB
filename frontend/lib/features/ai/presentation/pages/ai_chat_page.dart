@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import '../../../../core/di/injection.dart';
 import '../../data/datasources/ai_chat_local_ds.dart';
 import '../../../../core/utils/toast_helper.dart';
+
+import '../../../../core/network/api_client.dart';
 
 class AIChatPage extends StatefulWidget {
   const AIChatPage({super.key});
@@ -24,17 +27,28 @@ class _AIChatPageState extends State<AIChatPage> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final List<_Message> _messages = [];
+  List<AiChatModel> _chatHistory = [];
   bool _isLoading = false;
+  bool _isOffline = false;
 
   @override
   void initState() {
     super.initState();
+    _checkConnectivity();
     _loadHistory();
+  }
+
+  Future<void> _checkConnectivity() async {
+    final connectivityResult = await Connectivity().checkConnectivity();
+    setState(() {
+      _isOffline = connectivityResult.contains(ConnectivityResult.none);
+    });
   }
 
   Future<void> _loadHistory() async {
     final history = await getIt<AiChatLocalDataSource>().getChatHistory();
     setState(() {
+      _chatHistory = history;
       _messages.clear();
       _messages.add(_Message("Halo! Aku konsultan keuangan pribadi kamu. Ada yang bisa dibantu soal budget atau ngekos hari ini?", false, isFullyTyped: true, isNew: false));
       for (var chat in history) {
@@ -76,19 +90,19 @@ class _AIChatPageState extends State<AIChatPage> {
     _scrollToBottom();
 
     try {
-      final response = await Dio().post(
-        'https://b69e46f5d5620c.lhr.life/api/v1/ai/chat',
+      final response = await ApiClient.instance.post(
+        '/ai/chat',
         data: {'message': text},
       );
 
       if (response.statusCode == 200) {
         final reply = response.data['data']['reply'] as String;
+        final newChat = AiChatModel(prompt: text, response: reply, timestamp: DateTime.now());
+        await getIt<AiChatLocalDataSource>().insertChat(newChat);
         setState(() {
           _messages.add(_Message(reply, false));
+          _chatHistory.add(newChat);
         });
-        await getIt<AiChatLocalDataSource>().insertChat(
-          AiChatModel(prompt: text, response: reply, timestamp: DateTime.now())
-        );
         _scrollToBottom();
       }
     } on DioException catch (e) {
@@ -118,34 +132,163 @@ class _AIChatPageState extends State<AIChatPage> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-            onPressed: () async {
-              await getIt<AiChatLocalDataSource>().clearHistory();
-              _loadHistory();
-              ToastHelper.showSuccess(context, 'Histori obrolan dihapus');
+      ),
+      drawer: _buildDrawer(theme),
+      body: _isOffline 
+        ? _buildOfflineUI(theme)
+        : Column(
+            children: [
+              Expanded(
+                child: ListView.builder(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _messages.length + (_isLoading ? 1 : 0),
+                  itemBuilder: (context, index) {
+                    if (index == _messages.length) {
+                      return const _TypingIndicator();
+                    }
+                    final msg = _messages[index];
+                    return _buildChatBubble(msg, theme);
+                  },
+                ),
+              ),
+              _buildQuickPrompts(theme),
+              _buildInputArea(theme),
+            ],
+          ),
+    );
+  }
+
+  Widget _buildOfflineUI(ThemeData theme) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.wifi_off_rounded, size: 80, color: Colors.grey.shade400),
+          const SizedBox(height: 16),
+          Text(
+            "Anda sedang Offline",
+            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 40),
+            child: Text(
+              "Fitur AI membutuhkan koneksi internet untuk membalas pesan Anda. Silakan periksa koneksi internet Anda.",
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey),
+            ),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: () {
+              _checkConnectivity();
             },
+            icon: const Icon(Icons.refresh),
+            label: const Text("Coba Lagi"),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: theme.colorScheme.primary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            ),
           )
         ],
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.all(16),
-              itemCount: _messages.length + (_isLoading ? 1 : 0),
-              itemBuilder: (context, index) {
-                if (index == _messages.length) {
-                  return const _TypingIndicator();
-                }
-                final msg = _messages[index];
-                return _buildChatBubble(msg, theme);
+    );
+  }
+
+  Widget _buildQuickPrompts(ThemeData theme) {
+    if (_messages.length > 2) return const SizedBox(); // Only show when empty or just welcomed
+
+    final prompts = [
+      "Tolong evaluasi keuanganku bulan ini",
+      "Beri saya saran penghematan",
+      "Bantu buat rencana keuangan bulan depan"
+    ];
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      height: 40,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: prompts.length,
+        itemBuilder: (context, index) {
+          final prompt = prompts[index];
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: ActionChip(
+              backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
+              side: BorderSide(color: theme.colorScheme.primary.withOpacity(0.3)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              label: Text(prompt, style: TextStyle(color: theme.colorScheme.primary, fontSize: 12)),
+              onPressed: () {
+                _controller.text = prompt;
+                _sendMessage();
               },
             ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildDrawer(ThemeData theme) {
+    return Drawer(
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.only(top: 60, bottom: 20, left: 20, right: 20),
+            width: double.infinity,
+            color: theme.colorScheme.primary.withOpacity(0.1),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.history, size: 40, color: Colors.blue),
+                const SizedBox(height: 12),
+                Text("Riwayat Obrolan", style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+              ],
+            ),
           ),
-          _buildInputArea(theme),
+          Expanded(
+            child: _chatHistory.isEmpty 
+              ? const Center(child: Text("Belum ada riwayat", style: TextStyle(color: Colors.grey)))
+              : ListView.builder(
+                  padding: EdgeInsets.zero,
+                  itemCount: _chatHistory.length,
+                  itemBuilder: (context, index) {
+                    final chat = _chatHistory[index];
+                    return ListTile(
+                      leading: const Icon(Icons.chat_bubble_outline, size: 20),
+                      title: Text(
+                        chat.prompt, 
+                        maxLines: 1, 
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                      onTap: () {
+                        Navigator.pop(context); // Close drawer
+                        // We could scroll to index, but a simple close is fine for now
+                      },
+                    );
+                  },
+                ),
+          ),
+          const Divider(height: 1),
+          ListTile(
+            leading: const Icon(Icons.delete_outline, color: Colors.red),
+            title: const Text("Hapus Semua Riwayat", style: TextStyle(color: Colors.red)),
+            onTap: () async {
+              await getIt<AiChatLocalDataSource>().clearHistory();
+              _loadHistory();
+              if (mounted) {
+                Navigator.pop(context);
+                ToastHelper.showSuccess(context, 'Histori obrolan dihapus');
+              }
+            },
+          ),
+          const SizedBox(height: 100),
         ],
       ),
     );
@@ -156,7 +299,7 @@ class _AIChatPageState extends State<AIChatPage> {
         ? theme.colorScheme.primary.withOpacity(0.2) 
         : Colors.transparent;
         
-    final textColor = Colors.white;
+    final textColor = theme.textTheme.bodyLarge?.color ?? Colors.black;
 
     Widget bubble = Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
@@ -230,8 +373,13 @@ class _AIChatPageState extends State<AIChatPage> {
   }
 
   Widget _buildInputArea(ThemeData theme) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final extraPadding = bottomInset > 0 ? 0.0 : 100.0; // 100px to avoid navbar
+    
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12).copyWith(bottom: MediaQuery.of(context).padding.bottom + 12 + 90),
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12).copyWith(
+        bottom: MediaQuery.of(context).padding.bottom + 12 + extraPadding
+      ),
       decoration: BoxDecoration(
         color: theme.scaffoldBackgroundColor,
       ),
@@ -247,7 +395,7 @@ class _AIChatPageState extends State<AIChatPage> {
               ),
               child: TextField(
                 controller: _controller,
-                style: const TextStyle(color: Colors.white),
+                style: TextStyle(color: theme.colorScheme.onSurface),
                 maxLines: 4,
                 minLines: 1,
                 decoration: const InputDecoration(
