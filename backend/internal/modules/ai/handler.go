@@ -7,8 +7,15 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+type LocalContext struct {
+	TotalIncome        float64                  `json:"total_income"`
+	TotalExpense       float64                  `json:"total_expense"`
+	RecentTransactions []map[string]interface{} `json:"recent_transactions"`
+}
+
 type ChatRequest struct {
-	Message string `json:"message" binding:"required"`
+	Message      string       `json:"message" binding:"required"`
+	LocalContext LocalContext `json:"local_context"`
 }
 
 type Handler struct {
@@ -26,13 +33,11 @@ func (h *Handler) Chat(c *gin.Context) {
 		return
 	}
 
-	reply, err := h.service.GetAdvice(req.Message)
+	aiResult, err := h.service.GetAdvice(req.Message, req.LocalContext)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, "Gagal mendapatkan respon dari AI: "+err.Error())
 		return
 	}
 
-	response.Success(c, http.StatusOK, "Berhasil", gin.H{
-		"reply": reply,
-	})
+	response.Success(c, http.StatusOK, "Berhasil", aiResult)
 }
