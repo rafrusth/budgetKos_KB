@@ -28,7 +28,7 @@ finansial yang tepat, merencanakan keuangan kedepannya, maupun curhat apakah bul
 1. Buka folder frontend/build/app/outputs/flutter-apk
 2. Unduh app-release.apk
 3. Install .apk tersebut
-4. Aplikasi sudah siap! (Untuk fitur AI Chat perlu internet menyala)
+4. Aplikasi sudah siap! (Untuk fitur AI Chat perlu internet menyala (+ server))
 
 
 ## Tech Stack 🛠️
