@@ -33,11 +33,12 @@ finansial yang tepat, merencanakan keuangan kedepannya, maupun curhat apakah bul
 
 ## Tech Stack 🛠️
 
-- **Framework:** Flutter (+ Frontend)
+- **Framework:** Flutter, Gin Gonic
+- **Frontend:** Flutter
 - **Backend:** Go
-- **Tunneling (Backend):** Cloudflare
-- **Database:** SQLite
-- **AI:** Google Gemini
+- **Tunneling:** Cloudflare
+- **Database:** SQLite3
+- **AI Service:** Google Gemini
 
 ---
 
