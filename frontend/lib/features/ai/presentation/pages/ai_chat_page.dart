@@ -7,7 +7,11 @@ import '../../data/datasources/ai_chat_local_ds.dart';
 import '../../../../core/utils/toast_helper.dart';
 
 import '../../../../core/network/api_client.dart';
-
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../transaction/presentation/bloc/transaction_bloc.dart';
+import '../../../transaction/presentation/bloc/transaction_event.dart';
+import '../../../transactions/data/datasources/transaction_local_ds.dart';
+import '../../../../shared/models/transaction_model.dart';
 class AIChatPage extends StatefulWidget {
   const AIChatPage({super.key});
 
@@ -90,13 +94,67 @@ class _AIChatPageState extends State<AIChatPage> {
     _scrollToBottom();
 
     try {
+      final transactions = await getIt<TransactionLocalDataSource>().getTransactions();
+      double totalIncome = 0;
+      double totalExpense = 0;
+      List<Map<String, dynamic>> recentTxs = [];
+      
+      for (var i = 0; i < transactions.length; i++) {
+         final tx = transactions[i];
+         if (tx.type.toLowerCase() == 'income' || tx.type.toLowerCase() == 'pemasukan') {
+             totalIncome += tx.amount;
+         } else {
+             totalExpense += tx.amount;
+         }
+         if (i < 50) { // Kirim 50 transaksi terakhir saja agar tidak terlalu besar
+             recentTxs.add({
+                 'date': tx.date.toIso8601String(),
+                 'title': tx.title,
+                 'amount': tx.amount,
+                 'type': tx.type,
+                 'category': tx.category?.name ?? 'Umum',
+             });
+         }
+      }
+
+      final payload = {
+        'message': text,
+        'local_context': {
+            'total_income': totalIncome,
+            'total_expense': totalExpense,
+            'recent_transactions': recentTxs
+        }
+      };
+
       final response = await ApiClient.instance.post(
         '/ai/chat',
-        data: {'message': text},
+        data: payload,
       );
 
       if (response.statusCode == 200) {
         final reply = response.data['data']['reply'] as String;
+        final createdTxs = response.data['data']['created_transactions'] as List?;
+        
+        if (createdTxs != null && createdTxs.isNotEmpty) {
+          for (var txData in createdTxs) {
+            final model = TransactionModel(
+              id: txData['id'],
+              title: txData['title'] ?? '',
+              amount: (txData['amount'] as num).toDouble(),
+              type: txData['type'] ?? 'expense',
+              categoryId: txData['category_id'] ?? 1,
+              date: txData['date'] != null ? DateTime.parse(txData['date']) : DateTime.now(),
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now(),
+              isSynced: true,
+            );
+            await getIt<TransactionLocalDataSource>().insertTransaction(model);
+          }
+          if (mounted) {
+            context.read<TransactionBloc>().add(FetchTransactions());
+          }
+        }
+
         final newChat = AiChatModel(prompt: text, response: reply, timestamp: DateTime.now());
         await getIt<AiChatLocalDataSource>().insertChat(newChat);
         setState(() {
