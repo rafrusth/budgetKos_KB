@@ -8,10 +8,10 @@ import '../../../../core/utils/toast_helper.dart';
 
 import '../../../../core/network/api_client.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../transaction/presentation/bloc/transaction_bloc.dart';
-import '../../transaction/presentation/bloc/transaction_event.dart';
-import '../../transactions/data/datasources/transaction_local_ds.dart';
-import '../../transaction/data/models/transaction_model.dart';
+import '../../../transaction/presentation/bloc/transaction_bloc.dart';
+import '../../../transaction/presentation/bloc/transaction_event.dart';
+import '../../../transactions/data/datasources/transaction_local_ds.dart';
+import '../../../../shared/models/transaction_model.dart';
 class AIChatPage extends StatefulWidget {
   const AIChatPage({super.key});
 
@@ -137,8 +137,18 @@ class _AIChatPageState extends State<AIChatPage> {
         
         if (createdTxs != null && createdTxs.isNotEmpty) {
           for (var txData in createdTxs) {
-            final model = TransactionModel.fromJson(txData);
-            await getIt<TransactionLocalDataSource>().createTransaction(model);
+            final model = TransactionModel(
+              id: txData['id'],
+              title: txData['title'] ?? '',
+              amount: (txData['amount'] as num).toDouble(),
+              type: txData['type'] ?? 'expense',
+              categoryId: txData['category_id'] ?? 1,
+              date: txData['date'] != null ? DateTime.parse(txData['date']) : DateTime.now(),
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now(),
+              isSynced: true,
+            );
+            await getIt<TransactionLocalDataSource>().insertTransaction(model);
           }
           if (mounted) {
             context.read<TransactionBloc>().add(FetchTransactions());
