@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/di/injection.dart';
 import '../../data/datasources/ai_chat_local_ds.dart';
 import '../../../../core/utils/toast_helper.dart';
@@ -12,6 +13,8 @@ import '../../../transaction/presentation/bloc/transaction_bloc.dart';
 import '../../../transaction/presentation/bloc/transaction_event.dart';
 import '../../../transactions/data/datasources/transaction_local_ds.dart';
 import '../../../../shared/models/transaction_model.dart';
+import '../../../categories/data/datasources/category_local_ds.dart';
+import '../../../../shared/models/category_model.dart';
 class AIChatPage extends StatefulWidget {
   const AIChatPage({super.key});
 
@@ -34,6 +37,10 @@ class _AIChatPageState extends State<AIChatPage> {
   List<AiChatModel> _chatHistory = [];
   bool _isLoading = false;
   bool _isOffline = false;
+
+  /// Jumlah exchange (prompt+response) terakhir yang dikirim ke Gemini.
+  /// Menghemat token: hanya 5 percakapan terakhir, bukan seluruh riwayat.
+  static const int _kPreviousMessages = 5;
 
   @override
   void initState() {
@@ -122,7 +129,16 @@ class _AIChatPageState extends State<AIChatPage> {
         'local_context': {
             'total_income': totalIncome,
             'total_expense': totalExpense,
-            'recent_transactions': recentTxs
+            'recent_transactions': recentTxs,
+            // Fitur 2: Lokasi kampus otomatis
+            'campus_location': (await SharedPreferences.getInstance()).getString('user_campus_location') ?? '',
+            // Fitur 1: Sisa hari di bulan ini untuk burn-rate
+            'days_remaining_in_month': DateTime(DateTime.now().year, DateTime.now().month + 1, 0).day - DateTime.now().day,
+            // Fitur 3: K-previous messages (hemat token)
+            'chat_history': _chatHistory
+                .skip(_chatHistory.length > _kPreviousMessages ? _chatHistory.length - _kPreviousMessages : 0)
+                .map((c) => {'prompt': c.prompt, 'response': c.response})
+                .toList(),
         }
       };
 
@@ -134,8 +150,14 @@ class _AIChatPageState extends State<AIChatPage> {
       if (response.statusCode == 200) {
         final reply = response.data['data']['reply'] as String;
         final createdTxs = response.data['data']['created_transactions'] as List?;
+        final createdCats = response.data['data']['created_categories'] as List?;
+        final updatedCats = response.data['data']['updated_categories'] as List?;
+        final deletedCats = response.data['data']['deleted_categories'] as List?;
         
+        bool requiresRefresh = false;
+
         if (createdTxs != null && createdTxs.isNotEmpty) {
+          requiresRefresh = true;
           for (var txData in createdTxs) {
             final model = TransactionModel(
               id: txData['id'],
@@ -150,9 +172,47 @@ class _AIChatPageState extends State<AIChatPage> {
             );
             await getIt<TransactionLocalDataSource>().insertTransaction(model);
           }
-          if (mounted) {
-            context.read<TransactionBloc>().add(FetchTransactions());
+        }
+
+        if (createdCats != null && createdCats.isNotEmpty) {
+          requiresRefresh = true;
+          for (var catData in createdCats) {
+            final model = CategoryModel(
+              id: catData['id'] ?? 0,
+              name: catData['name'] ?? '',
+              type: catData['type'] ?? 'expense',
+              icon: catData['icon'] ?? '',
+              color: catData['color'] ?? '',
+            );
+            await getIt<CategoryLocalDataSource>().insertCategory(model);
           }
+        }
+
+        if (updatedCats != null && updatedCats.isNotEmpty) {
+          requiresRefresh = true;
+          for (var catData in updatedCats) {
+            final model = CategoryModel(
+              id: catData['id'] ?? 0,
+              name: catData['name'] ?? '',
+              type: catData['type'] ?? 'expense',
+              icon: catData['icon'] ?? '',
+              color: catData['color'] ?? '',
+            );
+            await getIt<CategoryLocalDataSource>().updateCategory(model);
+          }
+        }
+
+        if (deletedCats != null && deletedCats.isNotEmpty) {
+          requiresRefresh = true;
+          for (var id in deletedCats) {
+            if (id is num) {
+              await getIt<CategoryLocalDataSource>().deleteCategory(id.toInt());
+            }
+          }
+        }
+
+        if (requiresRefresh && mounted) {
+          context.read<TransactionBloc>().add(FetchTransactions());
         }
 
         final newChat = AiChatModel(prompt: text, response: reply, timestamp: DateTime.now());
@@ -186,10 +246,10 @@ class _AIChatPageState extends State<AIChatPage> {
     final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Bud-AI', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+        title: Text('Bud-AI', style: TextStyle(fontWeight: FontWeight.bold, color: theme.brightness == Brightness.dark ? Colors.white : Colors.black)),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: IconThemeData(color: theme.brightness == Brightness.dark ? Colors.white : Colors.black),
       ),
       drawer: _buildDrawer(theme),
       body: _isOffline 
@@ -346,7 +406,7 @@ class _AIChatPageState extends State<AIChatPage> {
               }
             },
           ),
-          const SizedBox(height: 100),
+          SizedBox(height: MediaQuery.of(context).size.height * 0.02 + 100),
         ],
       ),
     );
@@ -432,7 +492,7 @@ class _AIChatPageState extends State<AIChatPage> {
 
   Widget _buildInputArea(ThemeData theme) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-    final extraPadding = bottomInset > 0 ? 0.0 : 100.0; // 100px to avoid navbar
+    final extraPadding = bottomInset > 0 ? 0.0 : 100.0 + (MediaQuery.of(context).size.height * 0.03); // 100px to avoid navbar
     
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12).copyWith(

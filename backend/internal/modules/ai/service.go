@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"strings"
 	"time"
 
@@ -30,8 +31,11 @@ func NewService(txService transaction.Service, catService category.Service) Serv
 
 // Struct untuk mem-parsing balasan JSON dari Gemini
 type GeminiResponse struct {
-	Reply               string              `json:"reply"`
-	CreatedTransactions []GeminiTransaction `json:"created_transactions"`
+	Reply               string                 `json:"reply"`
+	CreatedTransactions []GeminiTransaction    `json:"created_transactions"`
+	CreatedCategories   []GeminiCategoryCreate `json:"created_categories"`
+	UpdatedCategories   []GeminiCategoryUpdate `json:"updated_categories"`
+	DeletedCategories   []uint                 `json:"deleted_categories"`
 }
 
 type GeminiTransaction struct {
@@ -39,6 +43,21 @@ type GeminiTransaction struct {
 	Amount     float64 `json:"amount"`
 	Type       string  `json:"type"` // "income" or "expense"
 	CategoryID uint    `json:"category_id"`
+}
+
+type GeminiCategoryCreate struct {
+	Name  string `json:"name"`
+	Type  string `json:"type"` // "income" or "expense"
+	Icon  string `json:"icon"` // Optional
+	Color string `json:"color"` // Optional hex color
+}
+
+type GeminiCategoryUpdate struct {
+	ID    uint   `json:"id"`
+	Name  string `json:"name"`
+	Type  string `json:"type"` // "income" or "expense"
+	Icon  string `json:"icon"` // Optional
+	Color string `json:"color"` // Optional hex color
 }
 
 func (s *service) GetAdvice(message string, localCtx LocalContext) (map[string]interface{}, error) {
@@ -90,8 +109,31 @@ func (s *service) GetAdvice(message string, localCtx LocalContext) (map[string]i
 		totalPengeluaran := localCtx.TotalExpense
 		sisaSaldo := totalPemasukan - totalPengeluaran
 		
+		// Burn-rate calculation
+		now := time.Now()
+		dayOfMonth := now.Day()
+		daysRemaining := localCtx.DaysRemainingInMonth
+		if daysRemaining <= 0 {
+			// Fallback: calculate from current date
+			lastDay := time.Date(now.Year(), now.Month()+1, 0, 0, 0, 0, 0, now.Location())
+			daysRemaining = lastDay.Day() - dayOfMonth
+		}
+
+		burnRate := 0.0
+		if dayOfMonth > 0 {
+			burnRate = totalPengeluaran / float64(dayOfMonth)
+		}
+		daysUntilBroke := 0.0
+		if burnRate > 0 {
+			daysUntilBroke = math.Floor(sisaSaldo / burnRate)
+		}
+
+		burnRateContext := fmt.Sprintf("\n\nAnalisis Burn-Rate:\n- Rata-rata pengeluaran per hari: Rp %.0f\n- Sisa hari di bulan ini: %d hari\n- Proyeksi hari uang habis: %.0f hari lagi (jika pola pengeluaran sama)\n- Proyeksi pengeluaran sampai akhir bulan: Rp %.0f\n",
+			burnRate, daysRemaining, daysUntilBroke, burnRate*float64(daysRemaining))
+
 		txContext = fmt.Sprintf("\n\nData keuangan riil saat ini (dari HP pengguna):\nTotal Pemasukan: Rp %.0f\nTotal Pengeluaran: Rp %.0f\nSisa Saldo: Rp %.0f\n\nRiwayat Transaksi Terakhir:\n%s\n",
 			totalPemasukan, totalPengeluaran, sisaSaldo, strings.Join(txLines, "\n"))
+		txContext += burnRateContext
 	} else {
 		txContext = "\n\nSaat ini pengguna belum memiliki data transaksi apapun."
 	}
@@ -99,33 +141,56 @@ func (s *service) GetAdvice(message string, localCtx LocalContext) (map[string]i
 	model := client.GenerativeModel("gemini-2.5-flash")
 	model.ResponseMIMEType = "application/json"
 
+	// Build location context
+	var locationContext string
+	if localCtx.CampusLocation != "" {
+		locationContext = fmt.Sprintf("\n\nLOKASI PENGGUNA: %s\nSELALU berikan rekomendasi harga, tempat makan, dan estimasi biaya hidup sesuai standar area %s. Jangan gunakan harga kota lain.", localCtx.CampusLocation, localCtx.CampusLocation)
+	}
+
 	systemPrompt := `Kamu adalah konsultan keuangan pribadi cerdas dan suportif untuk mahasiswa/anak kos.
 Gunakan bahasa gaul/santai khas anak muda Indonesia. Usahakan ringkas namun solutif.
 SELALU rujuk pada 'data keuangan riil' di bawah.
 
-TUGAS PENTING (OTOMASI):
-Jika pengguna meminta kamu untuk mencatat pengeluaran atau pemasukan baru (misal: "makan 15 ribu", "dapat uang saku 1 juta"), KAMU WAJIB memasukkannya ke dalam array "created_transactions" di JSON balasan.
-Pilih "category_id" HANYA dari Daftar Kategori Valid di bawah. Jangan mengarang category_id. Pastikan "type" hanya "income" atau "expense".
+TUGAS PENTING (BURN-RATE):
+Jika saldo pengguna menipis, WAJIB sebutkan burn-rate (rata-rata pengeluaran/hari) dan proyeksi kapan uang habis berdasarkan data Analisis Burn-Rate di bawah. Beri peringatan jika proyeksi kehabisan uang lebih cepat dari sisa hari di bulan ini.
+
+TUGAS PENTING (OTOMASI TRANSAKSI & KATEGORI):
+Jika pengguna meminta mencatat pengeluaran/pemasukan baru, WAJIB masukkan ke array "created_transactions". Pilih "category_id" HANYA dari Daftar Kategori Valid.
+Jika pengguna meminta membuat, mengubah, atau menghapus KATEGORI, WAJIB masukkan ke array "created_categories", "updated_categories", atau "deleted_categories".
+Untuk kategori baru, tipe harus "income" atau "expense", icon bisa emoji atau string icon, color bisa hex color.
 
 Kamu WAJIB mengembalikan HANYA format JSON seperti ini (tanpa markdown blok):
 {
-  "reply": "teks balasan kamu ke pengguna (misal: Oke udah dicatet ya! Sisa saldomu sekarang jadi...)",
-  "created_transactions": [
-    {
-      "title": "judul transaksi",
-      "amount": 15000,
-      "type": "expense",
-      "category_id": 1
-    }
-  ]
+  "reply": "teks balasan kamu ke pengguna",
+  "created_transactions": [{"title": "makan", "amount": 15000, "type": "expense", "category_id": 1}],
+  "created_categories": [{"name": "Uang Jajan", "type": "income", "icon": "💰", "color": "#00FF00"}],
+  "updated_categories": [{"id": 2, "name": "Bensin", "type": "expense", "icon": "🚗", "color": "#FF0000"}],
+  "deleted_categories": [3]
 }
-Biarkan array "created_transactions" kosong [] jika pengguna tidak meminta mencatat transaksi.`
+Biarkan array kosong [] jika tidak ada aksi terkait.`
 
 	model.SystemInstruction = &genai.Content{
-		Parts: []genai.Part{genai.Text(systemPrompt + catContext + txContext)},
+		Parts: []genai.Part{genai.Text(systemPrompt + catContext + txContext + locationContext)},
 	}
 
-	resp, err := model.GenerateContent(ctx, genai.Text(message))
+	// Build K-previous messages as multi-turn chat history
+	var chatHistory []*genai.Content
+	for _, h := range localCtx.ChatHistory {
+		chatHistory = append(chatHistory, &genai.Content{
+			Role:  "user",
+			Parts: []genai.Part{genai.Text(h.Prompt)},
+		})
+		chatHistory = append(chatHistory, &genai.Content{
+			Role:  "model",
+			Parts: []genai.Part{genai.Text(h.Response)},
+		})
+	}
+
+	// Use chat session with history for multi-turn conversation
+	chat := model.StartChat()
+	chat.History = chatHistory
+
+	resp, err := chat.SendMessage(ctx, genai.Text(message))
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +210,11 @@ Biarkan array "created_transactions" kosong [] jika pengguna tidak meminta menca
 			}
 
 			var createdRecords []transaction.Transaction
-			// Execute automation!
+			var createdCats []category.Category
+			var updatedCats []category.Category
+			var deletedCats []uint
+
+			// Execute transaction automation!
 			for _, t := range geminiResp.CreatedTransactions {
 				req := transaction.Transaction{
 					Title:      t.Title,
@@ -167,9 +236,36 @@ Biarkan array "created_transactions" kosong [] jika pengguna tidak meminta menca
 				}
 			}
 
+			// Execute category automation!
+			for _, c := range geminiResp.CreatedCategories {
+				req := category.Category{Name: c.Name, Type: c.Type, Icon: c.Icon, Color: c.Color}
+				saved, err := s.catService.CreateCategory(req)
+				if err == nil && saved != nil {
+					createdCats = append(createdCats, *saved)
+				}
+			}
+
+			for _, c := range geminiResp.UpdatedCategories {
+				req := category.Category{Name: c.Name, Type: c.Type, Icon: c.Icon, Color: c.Color}
+				updated, err := s.catService.UpdateCategory(c.ID, req)
+				if err == nil && updated != nil {
+					updatedCats = append(updatedCats, *updated)
+				}
+			}
+
+			for _, id := range geminiResp.DeletedCategories {
+				err := s.catService.DeleteCategory(id)
+				if err == nil {
+					deletedCats = append(deletedCats, id)
+				}
+			}
+
 			result := map[string]interface{}{
 				"reply":                geminiResp.Reply,
 				"created_transactions": createdRecords,
+				"created_categories":   createdCats,
+				"updated_categories":   updatedCats,
+				"deleted_categories":   deletedCats,
 			}
 			return result, nil
 		}
