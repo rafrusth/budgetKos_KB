@@ -42,9 +42,7 @@ finansial yang tepat, merencanakan keuangan kedepannya, maupun curhat apakah bul
 ---
 
 ## Screenshots 📸
-### Preview Aplikasi
 
-- **Halaman Utama**
 <a href="https://github.com/user-attachments/assets/c00a6a8d-18aa-487a-b4a0-343bd4106a15">
   <img src="https://github.com/user-attachments/assets/c00a6a8d-18aa-487a-b4a0-343bd4106a15" alt="Halaman Utama" width="200"/>
 </a>
