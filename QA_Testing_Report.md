@@ -1,4 +1,4 @@
-# Laporan Validasi Data & Evaluasi AI (Anggota 4)
+# Laporan Validasi Data & Evaluasi AI
 
 Dokumen ini berisi rencana pengujian, pencatatan hasil eksperimen, evaluasi respons AI, serta rangkuman kekuatan dan kelemahan aplikasi.
 
