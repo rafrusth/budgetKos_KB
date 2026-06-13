@@ -25,7 +25,11 @@ finansial yang tepat, merencanakan keuangan kedepannya, maupun curhat apakah bul
 
 #### [Android Only!]
 
-1. Buka folder frontend/build/app/outputs/flutter-apk
+1. Buka link Google Drive
+
+- https://drive.google.com/drive/folders/1qqvlFUk0boMIzpFTboMmZpZhXy7eJXZ_?usp=drive_link
+
+
 2. Unduh app-release.apk
 3. Install .apk tersebut
 4. Aplikasi sudah siap! (Untuk fitur AI Chat perlu internet menyala (+ server))
