@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 class ApiClient {
   /* ==================== Input from Cloudflare ==================== */
   static const String _tunnelUrl =
-      'https://brooklyn-validity-charms-factors.trycloudflare.com/api/v1';
+      'https://exciting-drops-instruction-municipal.trycloudflare.com/api/v1';
 
   static String get _baseUrl {
     // 1. If testing on Chrome (Web), localhost works perfectly.
