@@ -7,6 +7,7 @@ Atau seseorang yang disiplin finansial?
 
 Atapun seseorang yang sedang kesusahan dalam keuangan hidupnya?
 
+---
 Anda menemukan tempat yang tepat! Karena aplikasi ini menjawab permasalahan-permasalahan anda 👀
 
 Aplikasi ini bertujuan untuk mencatat pengeluaran anda secara rapi, tanpa mengatur manual segala hal. Cukup memasukkan nominal pengeluaran atau pemasukkan, tentukan kategori, dan anda selesai! 
