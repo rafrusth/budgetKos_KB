@@ -75,7 +75,7 @@ class TransactionsPage extends StatelessWidget {
                     child: ListTile(
                       contentPadding: const EdgeInsets.symmetric(vertical: 8),
                       leading: CircleAvatar(
-                        backgroundColor: color.withOpacity(0.1),
+                        backgroundColor: color.withValues(alpha: 0.1),
                         child: Icon(isIncome ? Icons.arrow_downward : Icons.arrow_upward, color: color),
                       ),
                       title: Text(tx.title, style: const TextStyle(fontWeight: FontWeight.bold)),

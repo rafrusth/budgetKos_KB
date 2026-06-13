@@ -20,8 +20,10 @@ class TransactionBottomSheet extends StatefulWidget {
       useRootNavigator: true,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Padding(
+      builder: (context) => AnimatedPadding(
         padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
         child: TransactionBottomSheet(initialType: type, initialTransaction: transaction),
       ),
     );
@@ -61,6 +63,7 @@ class _TransactionBottomSheetState extends State<TransactionBottomSheet> {
 
   @override
   void dispose() {
+    FocusManager.instance.primaryFocus?.unfocus();
     _amountController.dispose();
     _titleController.dispose();
     super.dispose();
@@ -122,9 +125,9 @@ class _TransactionBottomSheetState extends State<TransactionBottomSheet> {
     Widget content = Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: isDark ? Colors.black.withOpacity(0.4) : theme.scaffoldBackgroundColor,
+        color: isDark ? Colors.black.withValues(alpha: 0.4) : theme.scaffoldBackgroundColor,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-        border: Border(top: BorderSide(color: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.05))),
+        border: Border(top: BorderSide(color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.05))),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -135,7 +138,7 @@ class _TransactionBottomSheetState extends State<TransactionBottomSheet> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey.withOpacity(0.3),
+                color: Colors.grey.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -214,7 +217,7 @@ class _TransactionBottomSheetState extends State<TransactionBottomSheet> {
                 icon: const Icon(Icons.calendar_today, size: 16),
                 label: Text('${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}', style: const TextStyle(fontWeight: FontWeight.bold)),
                 style: TextButton.styleFrom(
-                  backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
+                  backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
                   foregroundColor: theme.colorScheme.primary,
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -247,7 +250,7 @@ class _TransactionBottomSheetState extends State<TransactionBottomSheet> {
                         onSelected: (val) {
                           if (val) setState(() => _selectedCategoryId = cat.id);
                         },
-                        selectedColor: theme.colorScheme.primary.withOpacity(0.2),
+                        selectedColor: theme.colorScheme.primary.withValues(alpha: 0.2),
                         backgroundColor: theme.cardColor,
                         labelStyle: TextStyle(
                           color: isSelected ? theme.colorScheme.primary : theme.textTheme.bodyMedium?.color,
@@ -257,7 +260,7 @@ class _TransactionBottomSheetState extends State<TransactionBottomSheet> {
                     }),
                     ActionChip(
                       label: Text('+ Kategori Baru', style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold)),
-                      backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
+                      backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide.none),
                       onPressed: () => _showAddCategoryDialog(context, theme),
                     ),
@@ -315,7 +318,7 @@ class _TransactionBottomSheetState extends State<TransactionBottomSheet> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.1) : (isDark ? Colors.grey[800] : Colors.grey[100]),
+          color: isSelected ? color.withValues(alpha: 0.1) : (isDark ? Colors.grey[800] : Colors.grey[100]),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected ? color : Colors.transparent,

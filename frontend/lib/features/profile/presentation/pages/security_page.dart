@@ -52,12 +52,16 @@ class _SecurityPageState extends State<SecurityPage> {
                 return;
               }
               final prefs = await SharedPreferences.getInstance();
+              if (!ctx.mounted) return;
+              
               if (isSettingNew) {
                 await prefs.setString('app_pin', pinController.text);
+                if (!ctx.mounted) return;
                 ToastHelper.showSuccess(ctx, 'PIN berhasil diaktifkan');
               } else {
                 if (pinController.text == _currentPin) {
                   await prefs.remove('app_pin');
+                  if (!ctx.mounted) return;
                   ToastHelper.showSuccess(ctx, 'PIN dinonaktifkan');
                 } else {
                   ToastHelper.showError(ctx, 'PIN salah!');
@@ -76,7 +80,6 @@ class _SecurityPageState extends State<SecurityPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(title: const Text('Keamanan')),
       body: ListView(

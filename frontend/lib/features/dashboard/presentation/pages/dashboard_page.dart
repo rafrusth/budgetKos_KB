@@ -1,6 +1,5 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:go_router/go_router.dart' as import_router;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -102,9 +101,9 @@ class _DashboardPageState extends State<DashboardPage> {
         Widget content = Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: isDark ? Colors.black.withOpacity(0.4) : theme.scaffoldBackgroundColor,
+            color: isDark ? Colors.black.withValues(alpha: 0.4) : theme.scaffoldBackgroundColor,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-            border: Border(top: BorderSide(color: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.05))),
+            border: Border(top: BorderSide(color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.05))),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -115,7 +114,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.grey.withOpacity(0.3),
+                    color: Colors.grey.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -180,8 +179,10 @@ class _DashboardPageState extends State<DashboardPage> {
           );
         }
 
-        return Padding(
+        return AnimatedPadding(
           padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
           child: ClipRRect(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
             child: content,
@@ -194,7 +195,6 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       body: BlocConsumer<TransactionBloc, TransactionState>(
@@ -266,9 +266,6 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _buildHeader(ThemeData theme) {
-    final isDark = theme.brightness == Brightness.dark;
-    final textColor = theme.textTheme.bodyLarge?.color;
-    
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -302,7 +299,7 @@ class _DashboardPageState extends State<DashboardPage> {
         borderRadius: BorderRadius.circular(32),
         boxShadow: [
           BoxShadow(
-            color: theme.colorScheme.tertiary.withOpacity(0.4),
+            color: theme.colorScheme.tertiary.withValues(alpha: 0.4),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -342,7 +339,7 @@ class _DashboardPageState extends State<DashboardPage> {
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
               value: progress,
-              backgroundColor: Colors.white.withOpacity(0.5),
+              backgroundColor: Colors.white.withValues(alpha: 0.5),
               valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.secondary),
               minHeight: 6,
             ),
@@ -378,7 +375,7 @@ class _DashboardPageState extends State<DashboardPage> {
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
+              color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
               blurRadius: 10,
               offset: const Offset(0, 5),
             ),
@@ -434,55 +431,6 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  Widget _buildQuickActions(BuildContext context, ThemeData theme) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        _actionButton(context, theme, CupertinoIcons.plus_circle, 'Transaksi', () {
-          TransactionBottomSheet.show(context, type: 'expense');
-        }),
-        _actionButton(context, theme, CupertinoIcons.chart_pie, 'Laporan', () {
-          import_router.GoRouter.of(context).push('/reports');
-        }),
-        _actionButton(context, theme, CupertinoIcons.chat_bubble_2, 'AI Chat', () {
-          import_router.GoRouter.of(context).push('/ai');
-        }),
-      ],
-    );
-  }
-
-  Widget _actionButton(BuildContext context, ThemeData theme, IconData icon, String label, VoidCallback onTap) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        splashColor: theme.colorScheme.primary.withOpacity(0.1),
-        highlightColor: theme.colorScheme.primary.withOpacity(0.05),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: theme.brightness == Brightness.dark ? theme.cardColor : Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(theme.brightness == Brightness.dark ? 0.2 : 0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
-              ),
-              child: Icon(icon, color: theme.textTheme.bodyMedium?.color),
-            ),
-            const SizedBox(height: 8),
-            Text(label, style: theme.textTheme.bodySmall?.copyWith(color: theme.textTheme.bodyMedium?.color, fontWeight: FontWeight.w500)),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _buildSectionTitle(ThemeData theme, String title, String action, {VoidCallback? onActionTap}) {
     return Row(
@@ -602,7 +550,7 @@ class _DashboardPageState extends State<DashboardPage> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
             blurRadius: 10,
             offset: const Offset(0, 5),
           ),
@@ -613,7 +561,7 @@ class _DashboardPageState extends State<DashboardPage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: _getChartColor(theme, type).withOpacity(0.1),
+              color: _getChartColor(theme, type).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Text(
@@ -656,7 +604,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   show: true,
                   drawVerticalLine: false,
                   getDrawingHorizontalLine: (value) => FlLine(
-                    color: Colors.grey.withOpacity(0.1),
+                    color: Colors.grey.withValues(alpha: 0.1),
                     strokeWidth: 1,
                   ),
                 ),
@@ -711,7 +659,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     dotData: const FlDotData(show: false),
                     belowBarData: BarAreaData(
                       show: true,
-                      color: _getChartColor(theme, type).withOpacity(0.2),
+                      color: _getChartColor(theme, type).withValues(alpha: 0.2),
                     ),
                   ),
                 ],
@@ -741,7 +689,7 @@ class _DashboardPageState extends State<DashboardPage> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
             blurRadius: 10,
             offset: const Offset(0, 5),
           ),
@@ -753,7 +701,7 @@ class _DashboardPageState extends State<DashboardPage> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(
@@ -822,36 +770,6 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  String _getChartTotal(TransactionLoaded state) {
-    switch (state.chartFilter) {
-      case ChartFilterType.income: return _formatMoney(state.totalIncome);
-      case ChartFilterType.expense: return _formatMoney(state.totalExpense);
-      case ChartFilterType.balance: return _formatMoney(state.balance);
-    }
-  }
-
-  Widget _filterChip(BuildContext context, ThemeData theme, String label, ChartFilterType type, ChartFilterType current) {
-    final isSelected = type == current;
-    return GestureDetector(
-      onTap: () {
-        context.read<TransactionBloc>().add(ChangeChartFilter(type));
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected ? theme.colorScheme.primary.withOpacity(0.1) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Text(
-          label,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: isSelected ? theme.colorScheme.primary : Colors.grey,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _buildRecentTransactions(BuildContext context, ThemeData theme, TransactionLoaded state) {
     final isDark = theme.brightness == Brightness.dark;
@@ -869,7 +787,7 @@ class _DashboardPageState extends State<DashboardPage> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
             blurRadius: 10,
             offset: const Offset(0, 5),
           ),
@@ -963,7 +881,7 @@ class _DashboardPageState extends State<DashboardPage> {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: iconColor.withOpacity(0.1),
+            color: iconColor.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(16),
           ),
           child: Icon(icon, color: iconColor),

@@ -52,10 +52,10 @@ class MainScaffold extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 7.5),
             decoration: BoxDecoration(
-              color: isDark ? Colors.black.withOpacity(0.4) : Colors.white.withOpacity(0.7),
+              color: isDark ? Colors.black.withValues(alpha: 0.4) : Colors.white.withValues(alpha: 0.7),
               borderRadius: BorderRadius.circular(100),
               border: Border.all(
-                color: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.05),
+                color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.05),
                 width: 1,
               ),
             ),
@@ -108,7 +108,7 @@ class MainScaffold extends StatelessWidget {
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: theme.colorScheme.primary.withOpacity(0.4),
+                  color: theme.colorScheme.primary.withValues(alpha: 0.4),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 )

@@ -253,7 +253,7 @@ class _ReportsPageState extends State<ReportsPage> {
                 color: theme.cardColor,
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(isDark ? 0.2 : 0.05), blurRadius: 10, offset: const Offset(0, 4)),
+                  BoxShadow(color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05), blurRadius: 10, offset: const Offset(0, 4)),
                 ],
               ),
               child: Column(children: legendWidgets),
@@ -269,7 +269,7 @@ class _ReportsPageState extends State<ReportsPage> {
                 icon: const Icon(Icons.filter_list, size: 18),
                 label: const Text("Filter & Urutkan"),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
+                  backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
                   foregroundColor: theme.colorScheme.primary,
                   elevation: 0,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -344,7 +344,7 @@ class _ReportsPageState extends State<ReportsPage> {
               BarChartRodData(
                 toY: amount,
                 gradient: LinearGradient(
-                  colors: [colors[index % colors.length].withOpacity(0.5), colors[index % colors.length]],
+                  colors: [colors[index % colors.length].withValues(alpha: 0.5), colors[index % colors.length]],
                   begin: Alignment.bottomCenter,
                   end: Alignment.topCenter,
                 ),
@@ -353,7 +353,7 @@ class _ReportsPageState extends State<ReportsPage> {
                 backDrawRodData: BackgroundBarChartRodData(
                   show: true,
                   toY: categoryTotals.values.reduce((a, b) => a > b ? a : b),
-                  color: Colors.grey.withOpacity(0.1),
+                  color: Colors.grey.withValues(alpha: 0.1),
                 ),
               )
             ],
@@ -460,7 +460,7 @@ class _ReportsPageState extends State<ReportsPage> {
             belowBarData: BarAreaData(
               show: true,
               gradient: LinearGradient(
-                colors: [color.withOpacity(0.4), color.withOpacity(0.0)],
+                colors: [color.withValues(alpha: 0.4), color.withValues(alpha: 0.0)],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
               ),
@@ -566,7 +566,7 @@ class _ReportsPageState extends State<ReportsPage> {
             child: ListTile(
               contentPadding: EdgeInsets.zero,
               leading: CircleAvatar(
-                backgroundColor: color.withOpacity(0.1),
+                backgroundColor: color.withValues(alpha: 0.1),
                 child: Icon(isIncome ? Icons.arrow_downward : Icons.arrow_upward, color: color),
               ),
               title: Text(tx.title, style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -615,9 +615,9 @@ class _ReportsPageState extends State<ReportsPage> {
             Widget content = Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: isDark ? Colors.black.withOpacity(0.4) : theme.scaffoldBackgroundColor,
+                color: isDark ? Colors.black.withValues(alpha: 0.4) : theme.scaffoldBackgroundColor,
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-                border: Border(top: BorderSide(color: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.05))),
+                border: Border(top: BorderSide(color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.05))),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -626,7 +626,7 @@ class _ReportsPageState extends State<ReportsPage> {
                   Center(
                     child: Container(
                       width: 40, height: 4,
-                      decoration: BoxDecoration(color: Colors.grey.withOpacity(0.3), borderRadius: BorderRadius.circular(2)),
+                      decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(2)),
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -786,9 +786,9 @@ class _ReportsPageState extends State<ReportsPage> {
             color: theme.cardColor,
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2)),
+              BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: const Offset(0, 2)),
             ],
-            border: Border.all(color: Colors.grey.withOpacity(0.1)),
+            border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -799,7 +799,7 @@ class _ReportsPageState extends State<ReportsPage> {
                   Expanded(child: Text(title, style: const TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis)),
                   Container(
                     padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
+                    decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
                     child: Icon(icon, size: 14, color: color),
                   )
                 ],

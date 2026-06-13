@@ -113,7 +113,7 @@ class _AIChatPageState extends State<AIChatPage> {
          } else {
              totalExpense += tx.amount;
          }
-         if (i < 50) { // Kirim 50 transaksi terakhir saja agar tidak terlalu besar
+         if (i < 10) { // Kirim 10 transaksi terakhir saja untuk mempercepat respons AI
              recentTxs.add({
                  'date': tx.date.toIso8601String(),
                  'title': tx.title,
@@ -337,8 +337,8 @@ class _AIChatPageState extends State<AIChatPage> {
           return Padding(
             padding: const EdgeInsets.only(right: 8),
             child: ActionChip(
-              backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
-              side: BorderSide(color: theme.colorScheme.primary.withOpacity(0.3)),
+              backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
+              side: BorderSide(color: theme.colorScheme.primary.withValues(alpha: 0.3)),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               label: Text(prompt, style: TextStyle(color: theme.colorScheme.primary, fontSize: 12)),
               onPressed: () {
@@ -359,7 +359,7 @@ class _AIChatPageState extends State<AIChatPage> {
           Container(
             padding: const EdgeInsets.only(top: 60, bottom: 20, left: 20, right: 20),
             width: double.infinity,
-            color: theme.colorScheme.primary.withOpacity(0.1),
+            color: theme.colorScheme.primary.withValues(alpha: 0.1),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -414,7 +414,7 @@ class _AIChatPageState extends State<AIChatPage> {
 
   Widget _buildChatBubble(_Message msg, ThemeData theme) {
     final bgColor = msg.isUser 
-        ? theme.colorScheme.primary.withOpacity(0.2) 
+        ? theme.colorScheme.primary.withValues(alpha: 0.2) 
         : Colors.transparent;
         
     final textColor = theme.textTheme.bodyLarge?.color ?? Colors.black;
@@ -566,8 +566,6 @@ class _TypingIndicatorState extends State<_TypingIndicator> with SingleTickerPro
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDarkMode = theme.brightness == Brightness.dark;
     
     return Align(
       alignment: Alignment.centerLeft,
@@ -647,7 +645,6 @@ class _TypewriterMarkdownTextState extends State<_TypewriterMarkdownText> {
 
   @override
   Widget build(BuildContext context) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return MarkdownBody(
       data: _displayedText,
       styleSheet: MarkdownStyleSheet(

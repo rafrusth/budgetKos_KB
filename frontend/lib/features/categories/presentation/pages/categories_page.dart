@@ -55,7 +55,7 @@ class CategoriesPage extends StatelessWidget {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       child: ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: categoryColor.withOpacity(0.2),
+                          backgroundColor: categoryColor.withValues(alpha: 0.2),
                           child: Icon(Icons.category, color: categoryColor), // Fallback icon
                         ),
                         title: Text(category.name, style: const TextStyle(fontWeight: FontWeight.bold)),

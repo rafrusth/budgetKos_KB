@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:budget_kos/features/dashboard/presentation/pages/dashboard_page.dart';
-import 'package:budget_kos/features/transactions/presentation/pages/transactions_page.dart';
 import 'package:budget_kos/features/reports/presentation/pages/reports_page.dart';
 import 'package:budget_kos/features/ai/presentation/pages/ai_chat_page.dart';
 import 'package:budget_kos/features/profile/presentation/pages/profile_page.dart';

@@ -19,7 +19,7 @@ class AppTheme {
         secondary: const Color(0xFF295CA3), // Dark Blue
         tertiary: const Color(0xFF4BA6E6), // Light Blue
         surface: const Color(0xFFFFFFFF),
-        surfaceVariant: const Color(0xFFF3F4F6), // Neutral Light Grey for cards/chips
+        surfaceContainerHighest: const Color(0xFFF3F4F6), // Neutral Light Grey for cards/chips
       ),
       textTheme: GoogleFonts.interTextTheme(),
     );
@@ -36,7 +36,7 @@ class AppTheme {
         primary: const Color(0xFF4BA6E6), // Light Blue stands out in dark mode
         secondary: const Color(0xFFCBE4F5), // Soft Blue
         surface: const Color(0xFF1E293B),
-        surfaceVariant: const Color(0xFF334155), // Dark Slate Grey for cards
+        surfaceContainerHighest: const Color(0xFF334155), // Dark Slate Grey for cards
       ),
       textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
     );

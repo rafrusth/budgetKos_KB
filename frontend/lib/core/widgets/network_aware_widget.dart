@@ -69,9 +69,9 @@ class _NetworkAwareWidgetState extends State<NetworkAwareWidget> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           decoration: BoxDecoration(
-            color: Colors.redAccent.withOpacity(0.8),
+            color: Colors.redAccent.withValues(alpha: 0.8),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withOpacity(0.2)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
           ),
           child: Row(
             children: [

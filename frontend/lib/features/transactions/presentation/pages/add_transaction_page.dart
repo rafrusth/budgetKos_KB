@@ -9,7 +9,7 @@ class AddTransactionPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Tambah Transaksi'),
-        backgroundColor: theme.colorScheme.background,
+        backgroundColor: theme.colorScheme.surface,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -25,7 +25,12 @@ class AddTransactionPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Jumlah', style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey)),
+                  Text(
+                    'Jumlah',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: Colors.grey,
+                    ),
+                  ),
                   const SizedBox(height: 8),
                   TextFormField(
                     decoration: const InputDecoration(
@@ -33,14 +38,16 @@ class AddTransactionPage extends StatelessWidget {
                       border: InputBorder.none,
                       hintText: '0',
                     ),
-                    style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+                    style: theme.textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                     keyboardType: TextInputType.number,
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 24),
-            
+
             // Note Input
             TextFormField(
               decoration: const InputDecoration(
@@ -49,7 +56,7 @@ class AddTransactionPage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 24),
-            
+
             // Save Button
             SizedBox(
               width: double.infinity,
@@ -65,7 +72,7 @@ class AddTransactionPage extends StatelessWidget {
                 },
                 child: const Text('Simpan'),
               ),
-            )
+            ),
           ],
         ),
       ),

@@ -47,16 +47,16 @@ type GeminiTransaction struct {
 
 type GeminiCategoryCreate struct {
 	Name  string `json:"name"`
-	Type  string `json:"type"` // "income" or "expense"
-	Icon  string `json:"icon"` // Optional
+	Type  string `json:"type"`  // "income" or "expense"
+	Icon  string `json:"icon"`  // Optional
 	Color string `json:"color"` // Optional hex color
 }
 
 type GeminiCategoryUpdate struct {
 	ID    uint   `json:"id"`
 	Name  string `json:"name"`
-	Type  string `json:"type"` // "income" or "expense"
-	Icon  string `json:"icon"` // Optional
+	Type  string `json:"type"`  // "income" or "expense"
+	Icon  string `json:"icon"`  // Optional
 	Color string `json:"color"` // Optional hex color
 }
 
@@ -101,14 +101,14 @@ func (s *service) GetAdvice(message string, localCtx LocalContext) (map[string]i
 			txType, _ := tx["type"].(string)
 			catName, _ := tx["category"].(string)
 			title, _ := tx["title"].(string)
-			
+
 			txLines = append(txLines, fmt.Sprintf("- %s: Rp %.0f (%s) - Kategori: %s - %s", dateStr, amount, txType, catName, title))
 		}
-		
+
 		totalPemasukan := localCtx.TotalIncome
 		totalPengeluaran := localCtx.TotalExpense
 		sisaSaldo := totalPemasukan - totalPengeluaran
-		
+
 		// Burn-rate calculation
 		now := time.Now()
 		dayOfMonth := now.Day()
@@ -138,7 +138,7 @@ func (s *service) GetAdvice(message string, localCtx LocalContext) (map[string]i
 		txContext = "\n\nSaat ini pengguna belum memiliki data transaksi apapun."
 	}
 
-	model := client.GenerativeModel("gemini-2.5-flash")
+	model := client.GenerativeModel("gemini-1.5-flash-8b")
 	model.ResponseMIMEType = "application/json"
 
 	// Build location context
@@ -155,14 +155,15 @@ TUGAS PENTING (BURN-RATE):
 Jika saldo pengguna menipis, WAJIB sebutkan burn-rate (rata-rata pengeluaran/hari) dan proyeksi kapan uang habis berdasarkan data Analisis Burn-Rate di bawah. Beri peringatan jika proyeksi kehabisan uang lebih cepat dari sisa hari di bulan ini.
 
 TUGAS PENTING (OTOMASI TRANSAKSI & KATEGORI):
-Jika pengguna meminta mencatat pengeluaran/pemasukan baru, WAJIB masukkan ke array "created_transactions". Pilih "category_id" HANYA dari Daftar Kategori Valid.
+Jika pengguna meminta mencatat pengeluaran/pemasukan baru, WAJIB masukkan ke array "created_transactions".
+ATURAN MEMILIH KATEGORI TRANSAKSI: Pilih "category_id" HANYA dari Daftar Kategori Valid. Kamu WAJIB menganalisis objek/barang dari transaksi tersebut secara logis untuk mencocokkan dengan kategori (misal: "nasi padang" -> ID kategori Makanan/Konsumsi, "pulpen" -> ID kategori ATK, "gojek" -> ID kategori Transportasi). Jangan asal tebak ID.
 Jika pengguna meminta membuat, mengubah, atau menghapus KATEGORI, WAJIB masukkan ke array "created_categories", "updated_categories", atau "deleted_categories".
 Untuk kategori baru, tipe harus "income" atau "expense", icon bisa emoji atau string icon, color bisa hex color.
 
 Kamu WAJIB mengembalikan HANYA format JSON seperti ini (tanpa markdown blok):
 {
   "reply": "teks balasan kamu ke pengguna",
-  "created_transactions": [{"title": "makan", "amount": 15000, "type": "expense", "category_id": 1}],
+  "created_transactions": [{"title": "makan nasi padang", "amount": 15000, "type": "expense", "category_id": 99}],
   "created_categories": [{"name": "Uang Jajan", "type": "income", "icon": "💰", "color": "#00FF00"}],
   "updated_categories": [{"id": 2, "name": "Bensin", "type": "expense", "icon": "🚗", "color": "#FF0000"}],
   "deleted_categories": [3]

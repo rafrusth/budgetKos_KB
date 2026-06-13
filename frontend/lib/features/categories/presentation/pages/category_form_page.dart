@@ -54,6 +54,7 @@ class _CategoryFormPageState extends State<CategoryFormPage> {
 
   @override
   void dispose() {
+    FocusManager.instance.primaryFocus?.unfocus();
     _nameController.dispose();
     super.dispose();
   }
@@ -110,27 +111,27 @@ class _CategoryFormPageState extends State<CategoryFormPage> {
               const SizedBox(height: 24),
               const Text('Tipe Transaksi', style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: RadioListTile<String>(
-                      title: const Text('Pengeluaran'),
-                      value: 'expense',
-                      groupValue: _selectedType,
-                      onChanged: (val) => setState(() => _selectedType = val!),
-                      contentPadding: EdgeInsets.zero,
+              RadioGroup<String>(
+                groupValue: _selectedType,
+                onChanged: (val) => setState(() => _selectedType = val!),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: RadioListTile<String>(
+                        title: const Text('Pengeluaran'),
+                        value: 'expense',
+                        contentPadding: EdgeInsets.zero,
+                      ),
                     ),
-                  ),
-                  Expanded(
-                    child: RadioListTile<String>(
-                      title: const Text('Pemasukan'),
-                      value: 'income',
-                      groupValue: _selectedType,
-                      onChanged: (val) => setState(() => _selectedType = val!),
-                      contentPadding: EdgeInsets.zero,
+                    Expanded(
+                      child: RadioListTile<String>(
+                        title: const Text('Pemasukan'),
+                        value: 'income',
+                        contentPadding: EdgeInsets.zero,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
               const SizedBox(height: 24),
               const Text('Warna', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -151,7 +152,7 @@ class _CategoryFormPageState extends State<CategoryFormPage> {
                         shape: BoxShape.circle,
                         border: isSelected ? Border.all(color: Colors.white, width: 3) : null,
                         boxShadow: isSelected
-                            ? [BoxShadow(color: color.withOpacity(0.5), blurRadius: 8, spreadRadius: 2)]
+                            ? [BoxShadow(color: color.withValues(alpha: 0.5), blurRadius: 8, spreadRadius: 2)]
                             : null,
                       ),
                       child: isSelected ? const Icon(Icons.check, color: Colors.white, size: 20) : null,

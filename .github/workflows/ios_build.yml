@@ -1,5 +1,8 @@
 name: iOS Build (No Codesign)
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 on:
   workflow_dispatch: # Memungkinkan trigger manual dari tab Actions di GitHub
 

@@ -61,8 +61,10 @@ class _ProfilePageState extends State<ProfilePage> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
-        return Padding(
+        return AnimatedPadding(
           padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
           child: Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
@@ -79,7 +81,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       width: 40,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: Colors.grey.withOpacity(0.3),
+                        color: Colors.grey.withValues(alpha: 0.3),
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -202,7 +204,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: Colors.green.withOpacity(0.15),
+                          color: Colors.green.withValues(alpha: 0.15),
                         ),
                         child: CircleAvatar(
                           radius: 50,
@@ -318,7 +320,7 @@ class _ProfilePageState extends State<ProfilePage> {
                               onPressed: () async {
                                 Navigator.pop(ctx);
                                 await getIt<SqliteHelper>().clearAllData();
-                                if (mounted) {
+                                if (context.mounted) {
                                   ToastHelper.showSuccess(context, 'Semua data berhasil dihapus!');
                                 }
                               },
@@ -350,16 +352,16 @@ class _ProfilePageState extends State<ProfilePage> {
         
         Widget content = Container(
           decoration: BoxDecoration(
-            color: isDark ? Colors.black.withOpacity(0.4) : Colors.white,
+            color: isDark ? Colors.black.withValues(alpha: 0.4) : Colors.white,
             borderRadius: BorderRadius.circular(32),
-            border: Border.all(color: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.05)),
+            border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.05)),
           ),
           child: SafeArea(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 const SizedBox(height: 12),
-                Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.withOpacity(0.3), borderRadius: BorderRadius.circular(2))),
+                Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(2))),
                 const SizedBox(height: 16),
                 const Text('Pilih Tema', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 16),
@@ -421,7 +423,7 @@ class _ProfilePageState extends State<ProfilePage> {
         ),
         Container(
           decoration: BoxDecoration(
-            color: isDark ? theme.colorScheme.surfaceVariant.withOpacity(0.5) : const Color(0xFFF3F4F6),
+            color: isDark ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5) : const Color(0xFFF3F4F6),
             borderRadius: BorderRadius.circular(24),
           ),
           child: Column(
@@ -459,7 +461,7 @@ class _ProfilePageState extends State<ProfilePage> {
           borderRadius: BorderRadius.circular(10),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.02),
+              color: Colors.black.withValues(alpha: 0.02),
               blurRadius: 4,
               offset: const Offset(0, 2),
             )

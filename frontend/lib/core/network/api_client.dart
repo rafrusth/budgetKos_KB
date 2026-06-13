@@ -1,17 +1,13 @@
-import 'dart:io' show Platform;
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 class ApiClient {
-  /* ==================== Input from Cloudflare ==================== */
+  /* ==================== Input from Cloudflare (/api/v1) ==================== */
   static const String _tunnelUrl =
       'https://exciting-drops-instruction-municipal.trycloudflare.com/api/v1';
 
   static String get _baseUrl {
-    // 1. If testing on Chrome (Web), localhost works perfectly.
     if (kIsWeb) return 'http://localhost:8081/api/v1';
-
-    // Force tunnel URL for Android to prevent Connection Refused on Physical Devices
     return _tunnelUrl;
   }
 
