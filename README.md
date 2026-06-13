@@ -32,7 +32,7 @@ finansial yang tepat, merencanakan keuangan kedepannya, maupun curhat apakah bul
 
 2. Unduh app-release.apk
 3. Install .apk tersebut
-4. Aplikasi sudah siap! (Untuk fitur AI Chat perlu internet menyala (+ server))
+4. Aplikasi sudah siap! (Untuk fitur AI Chat perlu internet dan server backend menyala)
 
 
 ## Tech Stack 🛠️
