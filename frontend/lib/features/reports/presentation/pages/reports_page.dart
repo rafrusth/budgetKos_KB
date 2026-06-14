@@ -810,7 +810,7 @@ class _ReportsPageState extends State<ReportsPage> {
       return Expanded(
         child: Container(
           height: 94,
-          padding: const EdgeInsets.only(left: 12, top: 12, right: 12, bottom: 8),
+          padding: const EdgeInsets.only(left: 12, top: 12, right: 12, bottom: 12),
           decoration: BoxDecoration(
             color: theme.cardColor,
             borderRadius: BorderRadius.circular(16),
@@ -825,8 +825,28 @@ class _ReportsPageState extends State<ReportsPage> {
             children: [
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(child: Text(title, style: const TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis)),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(title, style: const TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis),
+                        if (trendText != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              trendText, 
+                              style: TextStyle(
+                                fontSize: 10, 
+                                color: trendText.contains('Bahaya') || trendText.contains('Hari') && isDanger ? Colors.red : Colors.green, 
+                                fontWeight: FontWeight.bold
+                              )
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                   Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
@@ -834,19 +854,10 @@ class _ReportsPageState extends State<ReportsPage> {
                   )
                 ],
               ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(
-                    child: Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
-                  ),
-                  if (trendText != null)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 4),
-                      child: Text(trendText, style: TextStyle(fontSize: 14, color: trendText.contains('Bahaya') || trendText.contains('Hari') && isDanger ? Colors.red : Colors.green, fontWeight: FontWeight.w600)),
-                    ),
-                ],
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
             ],
           ),

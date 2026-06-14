@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
+import '../di/injection.dart';
+import '../sync/data/datasources/sync_local_data_source.dart';
 
 class WindowButtonsRow extends StatefulWidget {
   const WindowButtonsRow({super.key});
@@ -46,6 +48,50 @@ class _WindowButtonsRowState extends State<WindowButtonsRow> with WindowListener
     setState(() {
       _isMaximized = false;
     });
+  }
+
+  Future<bool> _hasPendingSync() async {
+    try {
+      final localDataSource = getIt<ISyncLocalDataSource>();
+      final pendingData = await localDataSource.getPendingData();
+      final hasTxs = (pendingData['transactions'] as List).isNotEmpty;
+      final hasCats = (pendingData['categories'] as List).isNotEmpty;
+      final hasDelTxs = (pendingData['deleted_transaction_ids'] as List).isNotEmpty;
+      final hasDelCats = (pendingData['deleted_category_ids'] as List).isNotEmpty;
+      return hasTxs || hasCats || hasDelTxs || hasDelCats;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  void onWindowClose() async {
+    final hasUnsynced = await _hasPendingSync();
+    if (hasUnsynced) {
+      if (!mounted) return;
+      final shouldClose = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text("Peringatan Sinkronisasi"),
+          content: const Text("Terdapat perubahan data yang belum tersimpan ke server. Jika Anda keluar sekarang, data belum tersinkronisasi. Yakin ingin keluar?"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text("Batal"),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text("Tetap Keluar", style: const TextStyle(color: Colors.red)),
+            ),
+          ],
+        ),
+      );
+      if (shouldClose == true) {
+        windowManager.destroy();
+      }
+    } else {
+      windowManager.destroy();
+    }
   }
 
   @override

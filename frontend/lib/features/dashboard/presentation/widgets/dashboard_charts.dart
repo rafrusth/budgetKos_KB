@@ -59,10 +59,12 @@ class DashboardCharts extends StatelessWidget {
                 width: MediaQuery.of(context).size.width - 48,
                 child: _buildChartCard(theme, isDark, state, ChartFilterType.income, state.totalIncome, true, false, isDesktop: isDesktop),
               ),
+              const SizedBox(width: 16),
               SizedBox(
                 width: MediaQuery.of(context).size.width - 48,
                 child: _buildChartCard(theme, isDark, state, ChartFilterType.expense, state.totalExpense, false, false, isDesktop: isDesktop),
               ),
+              const SizedBox(width: 16),
               SizedBox(
                 width: MediaQuery.of(context).size.width - 48,
                 child: _buildChartCard(theme, isDark, state, ChartFilterType.balance, state.balance, false, true, isDesktop: isDesktop),
@@ -241,7 +243,7 @@ class DashboardCharts extends StatelessWidget {
     );
 
     return Container(
-      margin: EdgeInsets.only(left: (isFirst && !isDesktop) ? 24 : (isDesktop ? 0 : 8), right: (isLast && !isDesktop) ? 24 : (isDesktop ? 0 : 8)),
+      margin: EdgeInsets.zero,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: theme.cardColor,
