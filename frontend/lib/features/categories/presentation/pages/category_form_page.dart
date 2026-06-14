@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../transaction/data/models/category_model.dart';
+import 'package:budget_kos/shared/models/category_model.dart';
 import '../bloc/category_bloc.dart';
 import '../bloc/category_event.dart';
 import '../../../../core/utils/toast_helper.dart';
@@ -62,7 +62,7 @@ class _CategoryFormPageState extends State<CategoryFormPage> {
   void _save() {
     if (_formKey.currentState!.validate()) {
       final newCategory = CategoryModel(
-        id: widget.category?.id ?? 0,
+        id: widget.category?.id,
         name: _nameController.text.trim(),
         icon: 'custom', // Simplified for now
         color: _selectedColor,
@@ -86,7 +86,29 @@ class _CategoryFormPageState extends State<CategoryFormPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.category == null ? 'Tambah Kategori' : 'Edit Kategori'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            GestureDetector(
+              onTap: () => Navigator.of(context).popUntil((route) => route.isFirst),
+              child: const Text('Profil', style: TextStyle(color: Colors.grey, fontSize: 16)),
+            ),
+            const Icon(Icons.chevron_right, color: Colors.grey, size: 20),
+            GestureDetector(
+              onTap: () => Navigator.of(context).pop(),
+              child: const Text('Kelola Kategori', style: TextStyle(color: Colors.grey, fontSize: 16)),
+            ),
+            const Icon(Icons.chevron_right, color: Colors.grey, size: 20),
+            Text(widget.category == null ? 'Tambah Kategori' : 'Edit Kategori', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          ],
+        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        titleSpacing: 0,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),

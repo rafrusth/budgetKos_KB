@@ -1,18 +1,15 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ApiClient {
-  /* ==================== Input from Cloudflare (/api/v1) ==================== */
-  static const String _tunnelUrl =
-      'https://exciting-drops-instruction-municipal.trycloudflare.com/api/v1';
-
   static String get _baseUrl {
-    if (kIsWeb) return 'http://localhost:8081/api/v1';
-    return _tunnelUrl;
+    return dotenv.env['BACKEND_URL'] ?? 'http://127.0.0.1:8080/api';
   }
 
   static Dio get instance {
-    return Dio(
+    final dio = Dio(
       BaseOptions(
         baseUrl: _baseUrl,
         connectTimeout: const Duration(seconds: 30),
@@ -24,5 +21,18 @@ class ApiClient {
         },
       ),
     );
+
+    dio.interceptors.add(InterceptorsWrapper(
+      onRequest: (options, handler) async {
+        const storage = FlutterSecureStorage();
+        final token = await storage.read(key: 'jwt_token');
+        if (token != null) {
+          options.headers['Authorization'] = 'Bearer $token';
+        }
+        return handler.next(options);
+      },
+    ));
+
+    return dio;
   }
 }

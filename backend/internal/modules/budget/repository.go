@@ -5,11 +5,11 @@ import (
 )
 
 type Repository interface {
-	FindAll() ([]Budget, error)
-	FindByID(id uint) (*Budget, error)
+	FindAll(userID string) ([]Budget, error)
+	FindByID(userID, id string) (*Budget, error)
 	Create(budget *Budget) error
 	Update(budget *Budget) error
-	Delete(id uint) error
+	Delete(userID, id string) error
 }
 
 type repository struct {
@@ -20,15 +20,15 @@ func NewRepository(db *gorm.DB) Repository {
 	return &repository{db}
 }
 
-func (r *repository) FindAll() ([]Budget, error) {
+func (r *repository) FindAll(userID string) ([]Budget, error) {
 	var budgets []Budget
-	err := r.db.Preload("Category").Find(&budgets).Error
+	err := r.db.Preload("Category").Where("user_id = ?", userID).Find(&budgets).Error
 	return budgets, err
 }
 
-func (r *repository) FindByID(id uint) (*Budget, error) {
+func (r *repository) FindByID(userID, id string) (*Budget, error) {
 	var budget Budget
-	err := r.db.Preload("Category").First(&budget, id).Error
+	err := r.db.Preload("Category").Where("id = ? AND user_id = ?", id, userID).First(&budget).Error
 	if err != nil {
 		return nil, err
 	}
@@ -43,6 +43,6 @@ func (r *repository) Update(budget *Budget) error {
 	return r.db.Save(budget).Error
 }
 
-func (r *repository) Delete(id uint) error {
-	return r.db.Delete(&Budget{}, id).Error
+func (r *repository) Delete(userID, id string) error {
+	return r.db.Where("id = ? AND user_id = ?", id, userID).Delete(&Budget{}).Error
 }

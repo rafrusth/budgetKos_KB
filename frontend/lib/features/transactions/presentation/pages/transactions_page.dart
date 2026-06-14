@@ -15,6 +15,15 @@ class TransactionsPage extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Semua Transaksi', style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () {
+              context.read<TransactionBloc>().add(FetchTransactions());
+            },
+            tooltip: 'Refresh',
+          ),
+        ],
       ),
       body: BlocBuilder<TransactionBloc, TransactionState>(
         builder: (context, state) {

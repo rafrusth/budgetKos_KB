@@ -1,4 +1,4 @@
-import '../../../transaction/data/models/category_model.dart';
+import 'package:budget_kos/shared/models/category_model.dart';
 
 abstract class CategoryState {}
 

@@ -35,13 +35,19 @@ func NewHandler(service Service) *Handler {
 }
 
 func (h *Handler) Chat(c *gin.Context) {
+	userID := c.GetString("user_id")
+	if userID == "" {
+		response.Error(c, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
 	var req ChatRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, http.StatusBadRequest, "Pesan tidak boleh kosong")
 		return
 	}
 
-	aiResult, err := h.service.GetAdvice(req.Message, req.LocalContext)
+	aiResult, err := h.service.GetAdvice(userID, req.Message, req.LocalContext)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, "Gagal mendapatkan respon dari AI: "+err.Error())
 		return

@@ -5,11 +5,11 @@ import (
 )
 
 type Repository interface {
-	FindAll() ([]Category, error)
-	FindByID(id uint) (*Category, error)
+	FindAll(userID string) ([]Category, error)
+	FindByID(userID, id string) (*Category, error)
 	Create(category *Category) error
 	Update(category *Category) error
-	Delete(id uint) error
+	Delete(userID, id string) error
 }
 
 type repository struct {
@@ -20,15 +20,15 @@ func NewRepository(db *gorm.DB) Repository {
 	return &repository{db}
 }
 
-func (r *repository) FindAll() ([]Category, error) {
+func (r *repository) FindAll(userID string) ([]Category, error) {
 	var categories []Category
-	err := r.db.Order("sort_order asc").Find(&categories).Error
+	err := r.db.Where("user_id = ?", userID).Order("sort_order asc").Find(&categories).Error
 	return categories, err
 }
 
-func (r *repository) FindByID(id uint) (*Category, error) {
+func (r *repository) FindByID(userID, id string) (*Category, error) {
 	var category Category
-	err := r.db.First(&category, id).Error
+	err := r.db.Where("id = ? AND user_id = ?", id, userID).First(&category).Error
 	if err != nil {
 		return nil, err
 	}
@@ -43,6 +43,6 @@ func (r *repository) Update(category *Category) error {
 	return r.db.Save(category).Error
 }
 
-func (r *repository) Delete(id uint) error {
-	return r.db.Delete(&Category{}, id).Error
+func (r *repository) Delete(userID, id string) error {
+	return r.db.Where("id = ? AND user_id = ?", id, userID).Delete(&Category{}).Error
 }

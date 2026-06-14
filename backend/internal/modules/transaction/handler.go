@@ -2,8 +2,6 @@ package transaction
 
 import (
 	"net/http"
-	"strconv"
-
 	"budget_kos/backend/pkg/response"
 	"github.com/gin-gonic/gin"
 )
@@ -17,7 +15,8 @@ func NewHandler(service Service) *Handler {
 }
 
 func (h *Handler) GetAll(c *gin.Context) {
-	txs, err := h.service.GetAll()
+	userID := c.GetString("user_id")
+	txs, err := h.service.GetAll(userID)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, "Failed to get transactions")
 		return
@@ -26,12 +25,13 @@ func (h *Handler) GetAll(c *gin.Context) {
 }
 
 func (h *Handler) Create(c *gin.Context) {
+	userID := c.GetString("user_id")
 	var req Transaction
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, http.StatusBadRequest, "Invalid request")
 		return
 	}
-	tx, err := h.service.Create(req)
+	tx, err := h.service.Create(userID, req)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, "Failed to create transaction")
 		return
@@ -40,8 +40,8 @@ func (h *Handler) Create(c *gin.Context) {
 }
 
 func (h *Handler) Update(c *gin.Context) {
+	userID := c.GetString("user_id")
 	idStr := c.Param("id")
-	id, _ := strconv.Atoi(idStr)
 
 	var req Transaction
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -49,7 +49,7 @@ func (h *Handler) Update(c *gin.Context) {
 		return
 	}
 
-	tx, err := h.service.Update(uint(id), req)
+	tx, err := h.service.Update(userID, idStr, req)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, "Failed to update transaction")
 		return
@@ -58,10 +58,10 @@ func (h *Handler) Update(c *gin.Context) {
 }
 
 func (h *Handler) Delete(c *gin.Context) {
+	userID := c.GetString("user_id")
 	idStr := c.Param("id")
-	id, _ := strconv.Atoi(idStr)
 
-	if err := h.service.Delete(uint(id)); err != nil {
+	if err := h.service.Delete(userID, idStr); err != nil {
 		response.Error(c, http.StatusInternalServerError, "Failed to delete transaction")
 		return
 	}

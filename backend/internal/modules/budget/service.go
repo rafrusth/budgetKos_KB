@@ -1,11 +1,11 @@
 package budget
 
 type Service interface {
-	GetAll() ([]Budget, error)
-	GetByID(id uint) (*Budget, error)
-	Create(req Budget) (*Budget, error)
-	Update(id uint, req Budget) (*Budget, error)
-	Delete(id uint) error
+	GetAll(userID string) ([]Budget, error)
+	GetByID(userID, id string) (*Budget, error)
+	Create(userID string, req Budget) (*Budget, error)
+	Update(userID, id string, req Budget) (*Budget, error)
+	Delete(userID, id string) error
 }
 
 type service struct {
@@ -16,21 +16,22 @@ func NewService(repo Repository) Service {
 	return &service{repo}
 }
 
-func (s *service) GetAll() ([]Budget, error) {
-	return s.repo.FindAll()
+func (s *service) GetAll(userID string) ([]Budget, error) {
+	return s.repo.FindAll(userID)
 }
 
-func (s *service) GetByID(id uint) (*Budget, error) {
-	return s.repo.FindByID(id)
+func (s *service) GetByID(userID, id string) (*Budget, error) {
+	return s.repo.FindByID(userID, id)
 }
 
-func (s *service) Create(req Budget) (*Budget, error) {
+func (s *service) Create(userID string, req Budget) (*Budget, error) {
+	req.UserID = userID
 	err := s.repo.Create(&req)
 	return &req, err
 }
 
-func (s *service) Update(id uint, req Budget) (*Budget, error) {
-	budget, err := s.repo.FindByID(id)
+func (s *service) Update(userID, id string, req Budget) (*Budget, error) {
+	budget, err := s.repo.FindByID(userID, id)
 	if err != nil {
 		return nil, err
 	}
@@ -43,6 +44,6 @@ func (s *service) Update(id uint, req Budget) (*Budget, error) {
 	return budget, err
 }
 
-func (s *service) Delete(id uint) error {
-	return s.repo.Delete(id)
+func (s *service) Delete(userID, id string) error {
+	return s.repo.Delete(userID, id)
 }

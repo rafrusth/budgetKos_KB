@@ -1,7 +1,8 @@
+import 'dart:io';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:injectable/injectable.dart';
-
+import 'package:path_provider/path_provider.dart';
 @lazySingleton
 class SqliteHelper {
   static Database? _database;
@@ -13,23 +14,31 @@ class SqliteHelper {
   }
 
   Future<Database> _initDatabase() async {
-    final dbPath = await getDatabasesPath();
+    String dbPath;
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      final dir = await getApplicationSupportDirectory();
+      if (!await dir.exists()) {
+        await dir.create(recursive: true);
+      }
+      dbPath = dir.path;
+    } else {
+      dbPath = await getDatabasesPath();
+    }
+    
     final path = join(dbPath, 'budgetkos.db');
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _onCreate,
       onUpgrade: (db, oldVersion, newVersion) async {
-        if (oldVersion < 2) {
-          await db.execute('''
-            CREATE TABLE ai_chats (
-              id INTEGER PRIMARY KEY AUTOINCREMENT,
-              prompt TEXT NOT NULL,
-              response TEXT NOT NULL,
-              timestamp TEXT NOT NULL
-            )
-          ''');
+        if (oldVersion < 3) {
+          // Drop all existing tables to wipe old integer-ID data
+          await db.execute('DROP TABLE IF EXISTS transactions');
+          await db.execute('DROP TABLE IF EXISTS categories');
+          await db.execute('DROP TABLE IF EXISTS ai_chats');
+          await db.execute('DROP TABLE IF EXISTS sync_metadata');
+          await _onCreate(db, newVersion);
         }
       },
     );
@@ -38,60 +47,56 @@ class SqliteHelper {
   Future<void> _onCreate(Database db, int version) async {
     await db.execute('''
       CREATE TABLE transactions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id TEXT PRIMARY KEY,
         title TEXT NOT NULL,
         amount REAL NOT NULL,
         type TEXT NOT NULL,
-        category_id INTEGER,
+        category_id TEXT,
         notes TEXT,
         date TEXT NOT NULL,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
-        is_synced INTEGER NOT NULL DEFAULT 0
+        sync_status INTEGER NOT NULL DEFAULT 0,
+        is_deleted INTEGER NOT NULL DEFAULT 0
       )
     ''');
     
     await db.execute('''
       CREATE TABLE categories (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         icon TEXT NOT NULL,
         color TEXT NOT NULL,
         type TEXT NOT NULL,
         is_default INTEGER NOT NULL DEFAULT 0,
-        sort_order INTEGER NOT NULL DEFAULT 0
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        sync_status INTEGER NOT NULL DEFAULT 0,
+        is_deleted INTEGER NOT NULL DEFAULT 0
       )
     ''');
     
     await db.execute('''
       CREATE TABLE ai_chats (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id TEXT PRIMARY KEY,
         prompt TEXT NOT NULL,
         response TEXT NOT NULL,
         timestamp TEXT NOT NULL
       )
     ''');
-    
-    // Seed default categories
-    final defaultCategories = [
-      {'name': 'Makanan', 'icon': 'restaurant', 'color': '#FF9800', 'type': 'expense'},
-      {'name': 'Transportasi', 'icon': 'directions_car', 'color': '#2196F3', 'type': 'expense'},
-      {'name': 'Tagihan', 'icon': 'receipt', 'color': '#F44336', 'type': 'expense'},
-      {'name': 'Belanja', 'icon': 'shopping_cart', 'color': '#9C27B0', 'type': 'expense'},
-      {'name': 'Gaji', 'icon': 'account_balance_wallet', 'color': '#4CAF50', 'type': 'income'},
-      {'name': 'Bonus', 'icon': 'card_giftcard', 'color': '#00BCD4', 'type': 'income'},
-    ];
 
-    for (var cat in defaultCategories) {
-      await db.insert('categories', {
-        'name': cat['name'],
-        'icon': cat['icon'],
-        'color': cat['color'],
-        'type': cat['type'],
-        'is_default': 1,
-        'sort_order': 0,
-      });
-    }
+    await db.execute('''
+      CREATE TABLE sync_metadata (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        last_pull_timestamp TEXT NOT NULL
+      )
+    ''');
+    
+    // Seed default categories is now handled differently, but we can generate UUIDs for them.
+    // However, it's better to let them sync from backend if this is an offline-first app connected to an existing account.
+    // For now, we will leave the tables empty and let the sync pull them, or we can generate UUIDs.
+    // We'll let the user manually add categories or pull from backend.
   }
 
   Future<void> clearAllData() async {

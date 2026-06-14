@@ -1,4 +1,4 @@
-import '../../data/models/transaction_model.dart';
+import 'package:budget_kos/shared/models/transaction_model.dart';
 
 abstract class TransactionEvent {}
 
@@ -8,7 +8,7 @@ class AddTransaction extends TransactionEvent {
   final String title;
   final double amount;
   final String type; // 'income' or 'expense'
-  final int categoryId;
+  final String categoryId;
   final DateTime date;
 
   AddTransaction({
@@ -34,7 +34,7 @@ class UpdateTransaction extends TransactionEvent {
 }
 
 class DeleteTransaction extends TransactionEvent {
-  final int transactionId;
+  final String transactionId;
   DeleteTransaction(this.transactionId);
 }
 

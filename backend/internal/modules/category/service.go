@@ -1,11 +1,11 @@
 package category
 
 type Service interface {
-	GetAllCategories() ([]Category, error)
-	GetCategoryByID(id uint) (*Category, error)
-	CreateCategory(req Category) (*Category, error)
-	UpdateCategory(id uint, req Category) (*Category, error)
-	DeleteCategory(id uint) error
+	GetAll(userID string) ([]Category, error)
+	GetByID(userID, id string) (*Category, error)
+	Create(userID string, req Category) (*Category, error)
+	Update(userID, id string, req Category) (*Category, error)
+	Delete(userID, id string) error
 }
 
 type service struct {
@@ -16,21 +16,22 @@ func NewService(repo Repository) Service {
 	return &service{repo}
 }
 
-func (s *service) GetAllCategories() ([]Category, error) {
-	return s.repo.FindAll()
+func (s *service) GetAll(userID string) ([]Category, error) {
+	return s.repo.FindAll(userID)
 }
 
-func (s *service) GetCategoryByID(id uint) (*Category, error) {
-	return s.repo.FindByID(id)
+func (s *service) GetByID(userID, id string) (*Category, error) {
+	return s.repo.FindByID(userID, id)
 }
 
-func (s *service) CreateCategory(req Category) (*Category, error) {
+func (s *service) Create(userID string, req Category) (*Category, error) {
+	req.UserID = userID
 	err := s.repo.Create(&req)
 	return &req, err
 }
 
-func (s *service) UpdateCategory(id uint, req Category) (*Category, error) {
-	cat, err := s.repo.FindByID(id)
+func (s *service) Update(userID, id string, req Category) (*Category, error) {
+	cat, err := s.repo.FindByID(userID, id)
 	if err != nil {
 		return nil, err
 	}
@@ -38,10 +39,13 @@ func (s *service) UpdateCategory(id uint, req Category) (*Category, error) {
 	cat.Icon = req.Icon
 	cat.Color = req.Color
 	cat.Type = req.Type
+	cat.IsDefault = req.IsDefault
+	cat.SortOrder = req.SortOrder
+
 	err = s.repo.Update(cat)
 	return cat, err
 }
 
-func (s *service) DeleteCategory(id uint) error {
-	return s.repo.Delete(id)
+func (s *service) Delete(userID, id string) error {
+	return s.repo.Delete(userID, id)
 }

@@ -1,32 +1,34 @@
 import 'package:injectable/injectable.dart';
 import 'package:budget_kos/core/database/sqlite_helper.dart';
 import 'package:budget_kos/shared/models/category_model.dart';
+import 'package:uuid/uuid.dart';
 
 abstract class CategoryLocalDataSource {
   Future<List<CategoryModel>> getCategories();
-  Future<CategoryModel?> getCategoryById(int id);
-  Future<int> insertCategory(CategoryModel category);
+  Future<CategoryModel?> getCategoryById(String id);
+  Future<String> insertCategory(CategoryModel category);
   Future<void> updateCategory(CategoryModel category);
-  Future<void> deleteCategory(int id);
+  Future<void> deleteCategory(String id);
 }
 
 @LazySingleton(as: CategoryLocalDataSource)
 class CategoryLocalDataSourceImpl implements CategoryLocalDataSource {
   final SqliteHelper sqliteHelper;
+  final Uuid _uuid = const Uuid();
 
   CategoryLocalDataSourceImpl(this.sqliteHelper);
 
   @override
   Future<List<CategoryModel>> getCategories() async {
     final db = await sqliteHelper.database;
-    final result = await db.query('categories', orderBy: 'sort_order ASC');
+    final result = await db.query('categories', where: 'is_deleted = 0', orderBy: 'sort_order ASC');
     return result.map((e) => CategoryModel.fromMap(e)).toList();
   }
 
   @override
-  Future<CategoryModel?> getCategoryById(int id) async {
+  Future<CategoryModel?> getCategoryById(String id) async {
     final db = await sqliteHelper.database;
-    final result = await db.query('categories', where: 'id = ?', whereArgs: [id]);
+    final result = await db.query('categories', where: 'id = ? AND is_deleted = 0', whereArgs: [id]);
     if (result.isNotEmpty) {
       return CategoryModel.fromMap(result.first);
     }
@@ -34,25 +36,53 @@ class CategoryLocalDataSourceImpl implements CategoryLocalDataSource {
   }
 
   @override
-  Future<int> insertCategory(CategoryModel category) async {
+  Future<String> insertCategory(CategoryModel category) async {
     final db = await sqliteHelper.database;
-    return await db.insert('categories', category.toMap());
+    final id = category.id ?? _uuid.v4();
+    final now = DateTime.now().toIso8601String();
+
+    final data = category.toMap();
+    data['id'] = id;
+    data['created_at'] = now;
+    data['updated_at'] = now;
+    data['sync_status'] = 1; // pending_insert
+    data['is_deleted'] = 0;
+
+    await db.insert('categories', data);
+    return id;
   }
 
   @override
   Future<void> updateCategory(CategoryModel category) async {
     final db = await sqliteHelper.database;
+    final data = category.toMap();
+    final now = DateTime.now().toIso8601String();
+    
+    data['updated_at'] = now;
+    data['sync_status'] = 2; // pending_update
+
     await db.update(
       'categories',
-      category.toMap(),
+      data,
       where: 'id = ?',
       whereArgs: [category.id],
     );
   }
 
   @override
-  Future<void> deleteCategory(int id) async {
+  Future<void> deleteCategory(String id) async {
     final db = await sqliteHelper.database;
-    await db.delete('categories', where: 'id = ?', whereArgs: [id]);
+    final now = DateTime.now().toIso8601String();
+    
+    await db.update(
+      'categories',
+      {
+        'is_deleted': 1,
+        'sync_status': 3, // pending_delete
+        'updated_at': now,
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 }

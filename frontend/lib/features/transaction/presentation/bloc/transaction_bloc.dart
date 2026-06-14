@@ -1,8 +1,8 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../domain/repositories/transaction_repository.dart';
-import '../../data/models/transaction_model.dart';
-import '../../data/models/category_model.dart';
+import 'package:budget_kos/shared/models/transaction_model.dart';
+import 'package:budget_kos/shared/models/category_model.dart';
 import 'transaction_event.dart';
 import 'transaction_state.dart';
 
@@ -56,13 +56,15 @@ class TransactionBloc extends Bloc<TransactionEvent, TransactionState> {
     if (state is TransactionLoaded) {
       try {
         final newTx = TransactionModel(
-          id: 0,
+          id: null,
           title: event.title,
           amount: event.amount,
           type: event.type,
           categoryId: event.categoryId,
           notes: '',
           date: event.date,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
         );
         
         await repository.addTransaction(newTx);

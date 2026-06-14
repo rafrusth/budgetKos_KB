@@ -7,6 +7,8 @@ import '../bloc/category_event.dart';
 import '../bloc/category_state.dart';
 import 'category_form_page.dart';
 import '../../../../core/utils/toast_helper.dart';
+import '../../../transaction/presentation/bloc/transaction_bloc.dart';
+import '../../../transaction/presentation/bloc/transaction_event.dart';
 
 class CategoriesPage extends StatelessWidget {
   const CategoriesPage({super.key});
@@ -17,9 +19,24 @@ class CategoriesPage extends StatelessWidget {
       create: (context) => getIt<CategoryBloc>()..add(FetchCategories()),
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Kelola Kategori', style: TextStyle(fontWeight: FontWeight.bold)),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          title: Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              GestureDetector(
+                onTap: () => Navigator.of(context).popUntil((route) => route.isFirst),
+                child: const Text('Profil', style: TextStyle(color: Colors.grey, fontSize: 16)),
+              ),
+              const Icon(Icons.chevron_right, color: Colors.grey, size: 20),
+              const Text('Kelola Kategori', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            ],
+          ),
           backgroundColor: Colors.transparent,
           elevation: 0,
+          titleSpacing: 0,
         ),
         body: BlocBuilder<CategoryBloc, CategoryState>(
           builder: (context, state) {
@@ -65,8 +82,8 @@ class CategoriesPage extends StatelessWidget {
                           children: [
                             IconButton(
                               icon: const Icon(CupertinoIcons.pencil, color: Colors.blue),
-                              onPressed: () {
-                                Navigator.of(context, rootNavigator: true).push(
+                              onPressed: () async {
+                                await Navigator.of(context).push(
                                   MaterialPageRoute(
                                     builder: (_) => BlocProvider.value(
                                       value: context.read<CategoryBloc>(),
@@ -74,6 +91,10 @@ class CategoriesPage extends StatelessWidget {
                                     ),
                                   ),
                                 );
+                                if (context.mounted) {
+                                  context.read<CategoryBloc>().add(FetchCategories());
+                                  context.read<TransactionBloc>().add(FetchTransactions());
+                                }
                               },
                             ),
                             IconButton(
@@ -88,8 +109,9 @@ class CategoriesPage extends StatelessWidget {
                                       TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
                                       TextButton(
                                         onPressed: () {
+                                          context.read<CategoryBloc>().add(DeleteCategory(category.id!));
+                                          context.read<TransactionBloc>().add(FetchTransactions());
                                           Navigator.pop(ctx);
-                                          context.read<CategoryBloc>().add(DeleteCategory(category.id));
                                           ToastHelper.showSuccess(context, 'Kategori dihapus');
                                         },
                                         child: const Text('Hapus', style: TextStyle(color: Colors.red)),
@@ -111,19 +133,29 @@ class CategoriesPage extends StatelessWidget {
           },
         ),
         floatingActionButton: Builder(
-          builder: (context) => FloatingActionButton(
-            onPressed: () {
-              Navigator.of(context, rootNavigator: true).push(
-                MaterialPageRoute(
-                  builder: (_) => BlocProvider.value(
-                    value: context.read<CategoryBloc>(),
-                    child: const CategoryFormPage(),
-                  ),
-                ),
-              );
-            },
-            child: const Icon(Icons.add),
-          ),
+          builder: (context) {
+            final isDesktop = MediaQuery.of(context).size.width > 800;
+            return Padding(
+              padding: EdgeInsets.only(bottom: isDesktop ? 0 : 100.0),
+              child: FloatingActionButton(
+                onPressed: () async {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => BlocProvider.value(
+                        value: context.read<CategoryBloc>(),
+                        child: const CategoryFormPage(),
+                      ),
+                    ),
+                  );
+                  if (context.mounted) {
+                    context.read<CategoryBloc>().add(FetchCategories());
+                    context.read<TransactionBloc>().add(FetchTransactions());
+                  }
+                },
+                child: const Icon(Icons.add),
+              ),
+            );
+          }
         ),
       ),
     );

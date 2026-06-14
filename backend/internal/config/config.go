@@ -8,9 +8,10 @@ import (
 
 type Config struct {
 	Port         string `mapstructure:"PORT"`
-	DBFile       string `mapstructure:"DB_FILE"`
+	DatabaseURL  string `mapstructure:"DATABASE_URL"`
 	GinMode      string `mapstructure:"GIN_MODE"`
-	GeminiAPIKey string `mapstructure:"GEMINI_API_KEY"`
+	GroqAPIKey   string `mapstructure:"GROQ_API_KEY"`
+	JWTSecret    string `mapstructure:"JWT_SECRET"`
 }
 
 var AppConfig *Config
@@ -34,7 +35,10 @@ func InitConfig() {
 	if AppConfig.Port == "" {
 		AppConfig.Port = "8080"
 	}
-	if AppConfig.DBFile == "" {
-		AppConfig.DBFile = "budgetkos.db"
+	if AppConfig.DatabaseURL == "" {
+		AppConfig.DatabaseURL = "host=localhost user=postgres password=postgres dbname=budgetkos port=5432 sslmode=disable TimeZone=Asia/Jakarta"
+	}
+	if AppConfig.JWTSecret == "" {
+		AppConfig.JWTSecret = "super-secret-key-for-development-only"
 	}
 }

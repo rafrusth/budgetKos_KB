@@ -37,7 +37,26 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Notifikasi')),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            GestureDetector(
+              onTap: () => Navigator.of(context).popUntil((route) => route.isFirst),
+              child: const Text('Profil', style: TextStyle(color: Colors.grey, fontSize: 16)),
+            ),
+            const Icon(Icons.chevron_right, color: Colors.grey, size: 20),
+            const Text('Notifikasi', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          ],
+        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        titleSpacing: 0,
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [

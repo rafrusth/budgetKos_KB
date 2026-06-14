@@ -5,13 +5,23 @@ import 'package:budget_kos/features/reports/presentation/pages/reports_page.dart
 import 'package:budget_kos/features/ai/presentation/pages/ai_chat_page.dart';
 import 'package:budget_kos/features/profile/presentation/pages/profile_page.dart';
 import 'package:budget_kos/core/presentation/pages/main_scaffold.dart';
+import 'package:budget_kos/features/auth/presentation/pages/login_page.dart';
+import 'package:budget_kos/features/auth/presentation/pages/register_page.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
 final GoRouter appRouter = GoRouter(
-  initialLocation: '/',
+  initialLocation: '/login',
   navigatorKey: _rootNavigatorKey,
   routes: [
+    GoRoute(
+      path: '/login',
+      builder: (context, state) => const LoginPage(),
+    ),
+    GoRoute(
+      path: '/register',
+      builder: (context, state) => const RegisterPage(),
+    ),
     StatefulShellRoute(
       navigatorContainerBuilder: (context, navigationShell, children) {
         return AnimatedBranchContainer(
@@ -27,7 +37,7 @@ final GoRouter appRouter = GoRouter(
         StatefulShellBranch(
           routes: [
             GoRoute(
-              path: '/',
+              path: '/dashboard',
               builder: (context, state) => const DashboardPage(),
             ),
           ],
@@ -72,22 +82,24 @@ class AnimatedBranchContainer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: children.asMap().entries.map((entry) {
-        final index = entry.key;
-        final child = entry.value;
-        return AnimatedSlide(
-          offset: index == currentIndex 
-              ? Offset.zero 
-              : Offset(index < currentIndex ? -1.0 : 1.0, 0.0),
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOutCubic,
-          child: IgnorePointer(
-            ignoring: index != currentIndex,
-            child: child,
-          ),
-        );
-      }).toList(),
+    return ClipRect(
+      child: Stack(
+        children: children.asMap().entries.map((entry) {
+          final index = entry.key;
+          final child = entry.value;
+          return AnimatedSlide(
+            offset: index == currentIndex 
+                ? Offset.zero 
+                : Offset(0.0, index < currentIndex ? -1.0 : 1.0),
+            duration: const Duration(milliseconds: 500),
+            curve: Curves.fastEaseInToSlowEaseOut,
+            child: IgnorePointer(
+              ignoring: index != currentIndex,
+              child: child,
+            ),
+          );
+        }).toList(),
+      ),
     );
   }
 }

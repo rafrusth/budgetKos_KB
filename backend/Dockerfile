@@ -1,5 +1,5 @@
 # Stage 1: Build
-FROM golang:1.26-alpine AS builder
+FROM golang:1.23-alpine AS builder
 
 # Install gcc and musl-dev because go-sqlite3 requires CGO
 RUN apk add --no-cache gcc musl-dev
@@ -27,12 +27,13 @@ RUN apk add --no-cache tzdata
 
 # Copy the compiled binary from the builder stage
 COPY --from=builder /app/server /app/server
+COPY --from=builder /app/.env /app/.env
 
 # Optional: Ensure data directory exists
 RUN mkdir -p /data
 
 # Expose port
-EXPOSE 8080
+EXPOSE 7860
 
 # Run the binary
 CMD ["/app/server"]

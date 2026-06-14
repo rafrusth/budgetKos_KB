@@ -1,11 +1,11 @@
 package transaction
 
 type Service interface {
-	GetAll() ([]Transaction, error)
-	GetByID(id uint) (*Transaction, error)
-	Create(req Transaction) (*Transaction, error)
-	Update(id uint, req Transaction) (*Transaction, error)
-	Delete(id uint) error
+	GetAll(userID string) ([]Transaction, error)
+	GetByID(userID, id string) (*Transaction, error)
+	Create(userID string, req Transaction) (*Transaction, error)
+	Update(userID, id string, req Transaction) (*Transaction, error)
+	Delete(userID, id string) error
 }
 
 type service struct {
@@ -16,21 +16,22 @@ func NewService(repo Repository) Service {
 	return &service{repo}
 }
 
-func (s *service) GetAll() ([]Transaction, error) {
-	return s.repo.FindAll()
+func (s *service) GetAll(userID string) ([]Transaction, error) {
+	return s.repo.FindAll(userID)
 }
 
-func (s *service) GetByID(id uint) (*Transaction, error) {
-	return s.repo.FindByID(id)
+func (s *service) GetByID(userID, id string) (*Transaction, error) {
+	return s.repo.FindByID(userID, id)
 }
 
-func (s *service) Create(req Transaction) (*Transaction, error) {
+func (s *service) Create(userID string, req Transaction) (*Transaction, error) {
+	req.UserID = userID
 	err := s.repo.Create(&req)
 	return &req, err
 }
 
-func (s *service) Update(id uint, req Transaction) (*Transaction, error) {
-	tx, err := s.repo.FindByID(id)
+func (s *service) Update(userID, id string, req Transaction) (*Transaction, error) {
+	tx, err := s.repo.FindByID(userID, id)
 	if err != nil {
 		return nil, err
 	}
@@ -45,6 +46,6 @@ func (s *service) Update(id uint, req Transaction) (*Transaction, error) {
 	return tx, err
 }
 
-func (s *service) Delete(id uint) error {
-	return s.repo.Delete(id)
+func (s *service) Delete(userID, id string) error {
+	return s.repo.Delete(userID, id)
 }

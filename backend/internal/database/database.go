@@ -7,7 +7,8 @@ import (
 	"budget_kos/backend/internal/modules/budget"
 	"budget_kos/backend/internal/modules/category"
 	"budget_kos/backend/internal/modules/transaction"
-	"gorm.io/driver/sqlite"
+	"budget_kos/backend/internal/modules/user"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
@@ -16,12 +17,12 @@ var DB *gorm.DB
 func ConnectDB() {
 	var err error
 
-	dbFile := config.AppConfig.DBFile
-	if dbFile == "" {
-		dbFile = "budgetkos.db"
-	}
+	dsn := config.AppConfig.DatabaseURL
 
-	DB, err = gorm.Open(sqlite.Open(dbFile), &gorm.Config{})
+	DB, err = gorm.Open(postgres.New(postgres.Config{
+		DSN:                  dsn,
+		PreferSimpleProtocol: true,
+	}), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
@@ -31,6 +32,7 @@ func ConnectDB() {
 
 func MigrateDB() {
 	err := DB.AutoMigrate(
+		&user.User{},
 		&category.Category{},
 		&transaction.Transaction{},
 		&budget.Budget{},

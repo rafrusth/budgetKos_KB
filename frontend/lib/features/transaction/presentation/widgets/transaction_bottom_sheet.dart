@@ -5,8 +5,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../bloc/transaction_bloc.dart';
 import '../bloc/transaction_event.dart';
 import '../bloc/transaction_state.dart';
-import '../../data/models/transaction_model.dart';
+import 'package:budget_kos/shared/models/transaction_model.dart';
 import '../../../../core/utils/toast_helper.dart';
+import '../../../../core/utils/popup_helper.dart';
 
 class TransactionBottomSheet extends StatefulWidget {
   final String initialType; // 'income' or 'expense'
@@ -15,11 +16,9 @@ class TransactionBottomSheet extends StatefulWidget {
   const TransactionBottomSheet({super.key, required this.initialType, this.initialTransaction});
 
   static void show(BuildContext context, {String type = 'expense', TransactionModel? transaction}) {
-    showModalBottomSheet(
+    PopupHelper.showAdaptivePopup(
       context: context,
-      useRootNavigator: true,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (context) => AnimatedPadding(
         padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
         duration: const Duration(milliseconds: 300),
@@ -35,7 +34,7 @@ class TransactionBottomSheet extends StatefulWidget {
 
 class _TransactionBottomSheetState extends State<TransactionBottomSheet> {
   late String _selectedType;
-  int? _selectedCategoryId;
+  String? _selectedCategoryId;
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _titleController = TextEditingController();
   DateTime _selectedDate = DateTime.now();
@@ -102,6 +101,8 @@ class _TransactionBottomSheetState extends State<TransactionBottomSheet> {
           categoryId: _selectedCategoryId!,
           date: _selectedDate,
           notes: widget.initialTransaction!.notes,
+          createdAt: widget.initialTransaction!.createdAt,
+          updatedAt: DateTime.now(),
         )
       ));
     } else {
@@ -115,6 +116,7 @@ class _TransactionBottomSheetState extends State<TransactionBottomSheet> {
     }
 
     Navigator.pop(context);
+    ToastHelper.showSuccess(context, widget.initialTransaction != null ? 'Berhasil mengubah transaksi' : 'Berhasil memasukkan transaksi');
   }
 
   @override

@@ -3,15 +3,20 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart' as import_router;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'dart:io' as import_io;
+import 'package:window_manager/window_manager.dart';
+import '../../../../core/widgets/custom_title_bar.dart';
 import '../../../../core/utils/toast_helper.dart';
+import '../../../../core/utils/popup_helper.dart';
 import '../../../transaction/presentation/bloc/transaction_bloc.dart';
 import '../../../transaction/presentation/bloc/transaction_state.dart';
 import '../../../transaction/presentation/bloc/transaction_event.dart';
 import '../../../transaction/presentation/widgets/transaction_bottom_sheet.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../transaction/data/models/transaction_model.dart';
+import 'package:budget_kos/shared/models/transaction_model.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import 'package:flutter/services.dart';
+import '../../../../core/utils/profile_notifier.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -91,15 +96,16 @@ class _DashboardPageState extends State<DashboardPage> {
       ).text;
     }
 
-    showModalBottomSheet(
+    PopupHelper.showAdaptivePopup(
       context: context,
-      useRootNavigator: true,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (context) {
         final isDark = theme.brightness == Brightness.dark;
         Widget content = Container(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+            left: 24, right: 24, top: 24,
+          ),
           decoration: BoxDecoration(
             color: isDark ? Colors.black.withValues(alpha: 0.4) : theme.scaffoldBackgroundColor,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
@@ -225,36 +231,19 @@ class _DashboardPageState extends State<DashboardPage> {
             if (state is TransactionLoading || state is TransactionInitial) {
               return const Center(child: CircularProgressIndicator());
             } else if (state is TransactionLoaded) {
-              return RefreshIndicator(
-                onRefresh: () async {
-                  context.read<TransactionBloc>().add(FetchTransactions());
-                  await _loadProfileAndBudget();
+              return LayoutBuilder(
+                builder: (context, constraints) {
+                  if (constraints.maxWidth > 800) {
+                    return _buildDesktopLayout(context, theme, state);
+                  }
+                  return RefreshIndicator(
+                    onRefresh: () async {
+                      context.read<TransactionBloc>().add(FetchTransactions());
+                      await _loadProfileAndBudget();
+                    },
+                    child: _buildMobileLayout(context, theme, state),
+                  );
                 },
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 16, bottom: 16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(padding: const EdgeInsets.symmetric(horizontal: 24.0), child: _buildHeader(theme)),
-                      const SizedBox(height: 30),
-                      Padding(padding: const EdgeInsets.symmetric(horizontal: 24.0), child: _buildBalanceCard(theme, state)),
-                      const SizedBox(height: 24),
-                      Padding(padding: const EdgeInsets.symmetric(horizontal: 24.0), child: _buildBudgetCard(theme, state)),
-                      const SizedBox(height: 32),
-                      Padding(padding: const EdgeInsets.symmetric(horizontal: 24.0), child: _buildSectionTitle(theme, 'Quick Stats', '')),
-                      const SizedBox(height: 16),
-                      _buildQuickStats(context, theme, state),
-                      const SizedBox(height: 32),
-                      Padding(padding: const EdgeInsets.symmetric(horizontal: 24.0), child: _buildSectionTitle(theme, 'Recent Transactions', 'See all', onActionTap: () {
-                        import_router.GoRouter.of(context).go('/reports');
-                      })),
-                      const SizedBox(height: 16),
-                      Padding(padding: const EdgeInsets.symmetric(horizontal: 24.0), child: _buildRecentTransactions(context, theme, state)),
-                      const SizedBox(height: 100), // padding for bottom nav
-                    ],
-                  ),
-                ),
               );
             } else if (state is TransactionError) {
               return Center(child: Text(state.message));
@@ -264,17 +253,167 @@ class _DashboardPageState extends State<DashboardPage> {
         ),
     );
   }
+  Widget _buildMobileLayout(BuildContext context, ThemeData theme, TransactionLoaded state) {
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(24, MediaQuery.of(context).padding.top + 24, 24, 120),
+      child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeader(theme),
+            const SizedBox(height: 24),
+            _buildBalanceCard(theme, state),
+            const SizedBox(height: 24),
+            _buildBudgetCard(context, theme, state, isDesktop: false),
+            const SizedBox(height: 24),
+            Text('Statistik', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            _buildQuickStats(context, theme, state, isDesktop: false),
+            const SizedBox(height: 24),
+            Text('Transaksi Sebelumnya', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            _buildRecentTransactions(context, theme, state),
+          ],
+        ),
+      );
+  }
+
+  Widget _buildDesktopLayout(BuildContext context, ThemeData theme, TransactionLoaded state) {
+    return Padding(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildHeader(theme),
+          const SizedBox(height: 24),
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final double availableWidth = constraints.maxWidth;
+                final bool isWide = availableWidth > 1100;
+
+                if (isWide) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        flex: 6,
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Left Column (Flex 2)
+                            Expanded(
+                              flex: 2,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(child: _buildBalanceCard(theme, state)),
+                                      const SizedBox(width: 24),
+                                      Expanded(child: _buildBudgetCard(context, theme, state)),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 24),
+                                  _buildSectionTitle(theme, 'Quick Stats', ''),
+                                  const SizedBox(height: 16),
+                                  _buildQuickStatsCards(context, theme, state, isDesktop: true),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 32),
+                            // Right Column (Flex 1)
+                            Expanded(
+                              flex: 1,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildSectionTitle(theme, 'Recent Transactions', 'See all', onActionTap: () {
+                                    import_router.GoRouter.of(context).go('/reports');
+                                  }),
+                                  const SizedBox(height: 16),
+                                  Expanded(child: _buildRecentTransactions(context, theme, state, isExpanded: true)),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Expanded(
+                        flex: 4,
+                        child: _buildQuickStatsCharts(context, theme, state, isDesktop: true, isExpanded: true),
+                      ),
+                    ],
+                  );
+                } else {
+                  return SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(child: _buildBalanceCard(theme, state)),
+                            const SizedBox(width: 24),
+                            Expanded(child: _buildBudgetCard(context, theme, state)),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        _buildSectionTitle(theme, 'Quick Stats', ''),
+                        const SizedBox(height: 16),
+                        _buildQuickStats(context, theme, state, isDesktop: true),
+                        const SizedBox(height: 24),
+                        _buildSectionTitle(theme, 'Recent Transactions', 'See all', onActionTap: () {
+                          import_router.GoRouter.of(context).go('/reports');
+                        }),
+                        const SizedBox(height: 16),
+                        _buildRecentTransactions(context, theme, state),
+                      ],
+                    ),
+                  );
+                }
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildHeader(ThemeData theme) {
+    return _buildHeaderContent(theme);
+  }
+
+  Widget _buildHeaderContent(ThemeData theme) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        ValueListenableBuilder<ProfileData>(
+          valueListenable: profileNotifier,
+          builder: (context, profile, child) {
+            final displayEmail = '@${profile.email.split('@').first}';
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Halo, ${profile.name}', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: 18)),
+                const SizedBox(height: 4),
+                Text(displayEmail, style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey)),
+              ],
+            );
+          },
+        ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Halo, $_userName', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: 18)),
-            const SizedBox(height: 4),
-            Text(_userEmail, style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey)),
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: () {
+                context.read<TransactionBloc>().add(FetchTransactions());
+              },
+              tooltip: 'Refresh',
+            ),
+            const SizedBox(width: 8),
+            const WindowButtonsRow(),
           ],
         ),
       ],
@@ -330,7 +469,7 @@ class _DashboardPageState extends State<DashboardPage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text("1 $monthName", style: const TextStyle(color: Colors.black54, fontSize: 12)),
-              Text("Hari ini ($currentDay)", style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 12)),
+              Text("$currentDay $monthName", style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 12)),
               Text("${lastDay.day} $monthName", style: const TextStyle(color: Colors.black54, fontSize: 12)),
             ],
           ),
@@ -358,7 +497,7 @@ class _DashboardPageState extends State<DashboardPage> {
     return res;
   }
 
-  Widget _buildBudgetCard(ThemeData theme, TransactionLoaded state) {
+  Widget _buildBudgetCard(BuildContext context, ThemeData theme, TransactionLoaded state, {bool isDesktop = true}) {
     final isDark = theme.brightness == Brightness.dark;
     final double expense = state.totalExpense;
     double progress = _monthlyBudget > 0 ? expense / _monthlyBudget : 0;
@@ -366,69 +505,81 @@ class _DashboardPageState extends State<DashboardPage> {
 
     final Color progressColor = progress > 0.8 ? Colors.red : (progress > 0.5 ? Colors.orange : Colors.green);
 
-    return GestureDetector(
-      onTap: () => _showSetBudgetDialog(context),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: theme.cardColor,
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 5),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Target Pengeluaran Bulanan', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
-                const Icon(Icons.edit, size: 16, color: Colors.grey),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Text('Rp ${_formatMoney(expense)}', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900, color: progressColor)),
-                Text(' / Rp ${_formatMoney(_monthlyBudget)}', style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey)),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Stack(
-              children: [
-                Container(
+    Widget card = Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Target Pengeluaran Bulanan', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
+              if (isDesktop)
+                IconButton(
+                  icon: const Icon(Icons.edit, size: 20),
+                  color: theme.colorScheme.primary,
+                  tooltip: 'Ubah Target',
+                  onPressed: () => _showSetBudgetDialog(context),
+                ),
+            ],
+          ),
+          if (!isDesktop) const SizedBox(height: 12),
+          if (isDesktop) const SizedBox(height: 12),
+          Row(
+            children: [
+              Text('Rp ${_formatMoney(expense)}', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900, color: progressColor)),
+              Text(' / Rp ${_formatMoney(_monthlyBudget)}', style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Stack(
+            children: [
+              Container(
+                height: 8,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              FractionallySizedBox(
+                widthFactor: progress,
+                child: Container(
                   height: 8,
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
+                    color: progressColor,
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
-                FractionallySizedBox(
-                  widthFactor: progress,
-                  child: Container(
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: progressColor,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              progress >= 1.0 ? 'Batas budget telah terlampaui!' : 'Tersisa Rp ${_formatMoney(_monthlyBudget - expense)}',
-              style: theme.textTheme.labelSmall?.copyWith(color: progress >= 1.0 ? Colors.red : Colors.grey),
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            progress >= 1.0 ? 'Batas budget telah terlampaui!' : 'Tersisa Rp ${_formatMoney(_monthlyBudget - expense)}',
+            style: theme.textTheme.labelSmall?.copyWith(color: progress >= 1.0 ? Colors.red : Colors.grey),
+          ),
+        ],
       ),
     );
+
+    if (!isDesktop) {
+      return GestureDetector(
+        onTap: () => _showSetBudgetDialog(context),
+        child: card,
+      );
+    }
+    return card;
   }
 
 
@@ -493,57 +644,108 @@ class _DashboardPageState extends State<DashboardPage> {
     return spots;
   }
 
-  Widget _buildQuickStats(BuildContext context, ThemeData theme, TransactionLoaded state) {
-    final isDark = theme.brightness == Brightness.dark;
-    
-    double incomeProgress = _incomeTarget > 0 ? state.totalIncome / _incomeTarget : 0;
-    double expenseProgress = _monthlyBudget > 0 ? state.totalExpense / _monthlyBudget : 0;
+  Widget _buildQuickStatsCards(BuildContext context, ThemeData theme, TransactionLoaded state, {bool isDesktop = false}) {
+    double incomeProgress = (_incomeTarget > 0 ? state.totalIncome / _incomeTarget : 0.0).clamp(0.0, 1.0);
+    double expenseProgress = (_monthlyBudget > 0 ? state.totalExpense / _monthlyBudget : 0.0).clamp(0.0, 1.0);
 
-    return Column(
+    if (!isDesktop) {
+      return Row(
+        children: [
+          Expanded(
+            child: _statCard(theme, 'Pemasukan', 'Rp ${_formatMoney(state.totalIncome)}', theme.colorScheme.primary, incomeProgress, onTap: _showEditIncomeDialog, isDesktop: isDesktop),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: _statCard(theme, 'Pengeluaran', 'Rp ${_formatMoney(state.totalExpense)}', theme.colorScheme.secondary, expenseProgress, onTap: () => _showSetBudgetDialog(context), isDesktop: isDesktop),
+          ),
+        ],
+      );
+    }
+
+    return Row(
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0),
-          child: Row(
-            children: [
-              Expanded(
-                child: GestureDetector(
-                  onTap: _showEditIncomeDialog,
-                  child: _statCard(theme, 'Pemasukan', 'Rp ${_formatMoney(state.totalIncome)}', theme.colorScheme.primary, incomeProgress),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => _showSetBudgetDialog(context), // Reuse edit budget for expense target
-                  child: _statCard(theme, 'Pengeluaran', 'Rp ${_formatMoney(state.totalExpense)}', theme.colorScheme.secondary, expenseProgress),
-                ),
-              ),
-            ],
-          ),
+        Expanded(
+          child: _statCard(theme, 'Pemasukan', 'Rp ${_formatMoney(state.totalIncome)}', theme.colorScheme.primary, incomeProgress, onTap: _showEditIncomeDialog, isDesktop: isDesktop),
         ),
-        const SizedBox(height: 24),
-        SizedBox(
-          height: MediaQuery.of(context).size.width * 0.85, // Make it roughly square based on viewportFraction
-          child: PageView(
-            controller: PageController(viewportFraction: 0.9),
-            padEnds: false,
-            children: [
-              _buildChartCard(theme, isDark, state, ChartFilterType.income, state.totalIncome, true),
-              _buildChartCard(theme, isDark, state, ChartFilterType.expense, state.totalExpense, false),
-              _buildChartCard(theme, isDark, state, ChartFilterType.balance, state.balance, false),
-            ],
-          ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: _statCard(theme, 'Pengeluaran', 'Rp ${_formatMoney(state.totalExpense)}', theme.colorScheme.secondary, expenseProgress, onTap: () => _showSetBudgetDialog(context), isDesktop: isDesktop),
         ),
       ],
     );
   }
 
-  Widget _buildChartCard(ThemeData theme, bool isDark, TransactionLoaded state, ChartFilterType type, double total, bool isFirst) {
+  Widget _buildQuickStatsCharts(BuildContext context, ThemeData theme, TransactionLoaded state, {bool isDesktop = false, bool isExpanded = false}) {
+    final isDark = theme.brightness == Brightness.dark;
+    
+    if (isDesktop) {
+      final child = Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: Row(
+              children: [
+                Expanded(child: _buildChartCard(theme, isDark, state, ChartFilterType.income, state.totalIncome, true, false, isDesktop: true)),
+                const SizedBox(width: 24),
+                Expanded(child: _buildChartCard(theme, isDark, state, ChartFilterType.expense, state.totalExpense, false, false, isDesktop: true)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 32),
+          Expanded(
+            flex: 1,
+            child: _buildChartCard(theme, isDark, state, ChartFilterType.balance, state.balance, false, true, isDesktop: true),
+          ),
+        ],
+      );
+      if (isExpanded) return child;
+      return SizedBox(
+        height: 220,
+        child: child,
+      );
+    } else {
+      return SizedBox(
+        height: MediaQuery.of(context).size.width * 0.85,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          clipBehavior: Clip.none,
+          child: Row(
+            children: [
+              SizedBox(
+                width: MediaQuery.of(context).size.width - 48,
+                child: _buildChartCard(theme, isDark, state, ChartFilterType.income, state.totalIncome, true, false, isDesktop: isDesktop),
+              ),
+              SizedBox(
+                width: MediaQuery.of(context).size.width - 48,
+                child: _buildChartCard(theme, isDark, state, ChartFilterType.expense, state.totalExpense, false, false, isDesktop: isDesktop),
+              ),
+              SizedBox(
+                width: MediaQuery.of(context).size.width - 48,
+                child: _buildChartCard(theme, isDark, state, ChartFilterType.balance, state.balance, false, true, isDesktop: isDesktop),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+  }
+
+  Widget _buildQuickStats(BuildContext context, ThemeData theme, TransactionLoaded state, {bool isDesktop = false}) {
+    return Column(
+      children: [
+        _buildQuickStatsCards(context, theme, state, isDesktop: isDesktop),
+        const SizedBox(height: 24),
+        _buildQuickStatsCharts(context, theme, state, isDesktop: isDesktop),
+      ],
+    );
+  }
+
+  Widget _buildChartCard(ThemeData theme, bool isDark, TransactionLoaded state, ChartFilterType type, double total, bool isFirst, bool isLast, {bool isDesktop = false}) {
     final chartData = _generateChartData(state.transactions, type);
     final String title = type == ChartFilterType.income ? "Pemasukan" : type == ChartFilterType.expense ? "Pengeluaran" : "Saldo";
     
     return Container(
-      margin: EdgeInsets.only(left: isFirst ? 24 : 8, right: 8),
+      margin: EdgeInsets.only(left: (isFirst && !isDesktop) ? 24 : (isDesktop ? 0 : 8), right: (isLast && !isDesktop) ? 24 : (isDesktop ? 0 : 8)),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: theme.cardColor,
@@ -573,9 +775,11 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
           ),
           const SizedBox(height: 16),
-          Expanded(
-            child: LineChart(
-              LineChartData(
+          Flexible(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 150),
+              child: LineChart(
+                LineChartData(
                 lineTouchData: LineTouchData(
                   touchTooltipData: LineTouchTooltipData(
                     getTooltipItems: (touchedSpots) {
@@ -663,6 +867,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     ),
                   ),
                 ],
+                ),
               ),
             ),
           ),
@@ -679,10 +884,10 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  Widget _statCard(ThemeData theme, String title, String amount, Color color, double progress) {
+  Widget _statCard(ThemeData theme, String title, String amount, Color color, double progress, {VoidCallback? onTap, bool isDesktop = true}) {
     final isDark = theme.brightness == Brightness.dark;
     
-    return Container(
+    Widget card = Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: theme.cardColor,
@@ -698,17 +903,30 @@ class _DashboardPageState extends State<DashboardPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              title == 'Pemasukan' ? Icons.arrow_downward : Icons.arrow_upward,
-              color: color,
-              size: 16,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  title == 'Pemasukan' ? Icons.arrow_downward : Icons.arrow_upward,
+                  color: color,
+                  size: 16,
+                ),
+              ),
+              if (onTap != null && isDesktop)
+                IconButton(
+                  icon: const Icon(Icons.edit, size: 16),
+                  color: theme.colorScheme.primary,
+                  onPressed: onTap,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+            ],
           ),
           const SizedBox(height: 16),
           Text(title, style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey, fontWeight: FontWeight.w500)),
@@ -760,6 +978,14 @@ class _DashboardPageState extends State<DashboardPage> {
         ],
       ),
     );
+
+    if (!isDesktop && onTap != null) {
+      return GestureDetector(
+        onTap: onTap,
+        child: card,
+      );
+    }
+    return card;
   }
 
   Color _getChartColor(ThemeData theme, ChartFilterType type) {
@@ -771,7 +997,7 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
 
-  Widget _buildRecentTransactions(BuildContext context, ThemeData theme, TransactionLoaded state) {
+  Widget _buildRecentTransactions(BuildContext context, ThemeData theme, TransactionLoaded state, {bool isExpanded = false}) {
     final isDark = theme.brightness == Brightness.dark;
     
     if (state.transactions.isEmpty) {
@@ -827,7 +1053,7 @@ class _DashboardPageState extends State<DashboardPage> {
               );
             },
             onDismissed: (direction) {
-              context.read<TransactionBloc>().add(DeleteTransaction(tx.id));
+              context.read<TransactionBloc>().add(DeleteTransaction(tx.id!));
               ToastHelper.showSuccess(context, 'Transaksi berhasil dihapus');
             },
             child: InkWell(

@@ -1,4 +1,4 @@
-import '../../../transaction/data/models/category_model.dart';
+import 'package:budget_kos/shared/models/category_model.dart';
 
 abstract class CategoryEvent {}
 
@@ -15,6 +15,6 @@ class UpdateCategory extends CategoryEvent {
 }
 
 class DeleteCategory extends CategoryEvent {
-  final int id;
+  final String id;
   DeleteCategory(this.id);
 }

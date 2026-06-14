@@ -1,13 +1,20 @@
 import 'dart:ui';
+import 'dart:io' as import_io;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:window_manager/window_manager.dart';
+import 'package:intl/intl.dart';
 import '../../../../core/utils/toast_helper.dart';
+import '../../../../core/widgets/custom_title_bar.dart';
+
+import '../../../../core/utils/popup_helper.dart';
 import '../../../transaction/presentation/bloc/transaction_bloc.dart';
 import '../../../transaction/presentation/bloc/transaction_state.dart';
 import '../../../transaction/presentation/bloc/transaction_event.dart';
-import '../../../transaction/data/models/transaction_model.dart';
-import '../../../transaction/data/models/category_model.dart';
+import 'package:budget_kos/shared/models/transaction_model.dart';
+import 'package:budget_kos/shared/models/category_model.dart';
+import 'package:go_router/go_router.dart' as import_router;
 import '../../../transaction/presentation/widgets/transaction_bottom_sheet.dart' as import_transaction_sheet;
 
 enum ChartType { pie, bar, line }
@@ -41,7 +48,7 @@ class _ReportsPageState extends State<ReportsPage> {
   // Filter states
   TimeFilter _timeFilter = TimeFilter.all;
   DateTimeRange? _customDateRange;
-  int? _filterCategoryId; // null = All
+  String? _filterCategoryId; // null = All
   SortOrder _sortOrder = SortOrder.newest;
 
   @override
@@ -55,6 +62,12 @@ class _ReportsPageState extends State<ReportsPage> {
         title: const Text("Laporan Keuangan", style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        actions: const [
+          WindowButtonsRow(),
+        ],
+        flexibleSpace: import_io.Platform.isWindows || import_io.Platform.isLinux || import_io.Platform.isMacOS
+            ? DragToMoveArea(child: Container(color: Colors.transparent))
+            : null,
       ),
       body: BlocBuilder<TransactionBloc, TransactionState>(
         builder: (context, state) {
@@ -134,7 +147,19 @@ class _ReportsPageState extends State<ReportsPage> {
     Map<String, double> rawCategoryTotals = {};
     double totalExpense = 0;
     for (var tx in expenseTxForChart) {
-      final catName = tx.category?.name ?? 'Lainnya';
+      String catName = tx.category?.name ?? '';
+      if (catName.isEmpty) {
+        try {
+          final cat = state.categories.firstWhere((c) => c.id?.toLowerCase() == tx.categoryId.toLowerCase());
+          catName = cat.name;
+        } catch (_) {
+          if (tx.categoryId.contains('-')) {
+            catName = 'Lainnya';
+          } else {
+            catName = tx.categoryId;
+          }
+        }
+      }
       rawCategoryTotals[catName] = (rawCategoryTotals[catName] ?? 0) + tx.amount;
       totalExpense += tx.amount;
     }
@@ -232,7 +257,7 @@ class _ReportsPageState extends State<ReportsPage> {
               child: _selectedChart == ChartType.pie
                   ? Stack(
                       children: [
-                        _buildChart(categoryTotals, expenseTxForChart, colors, totalExpense),
+                        _buildChart(categoryTotals, expenseTxForChart, colors, totalExpense, state),
                         Center(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
@@ -244,7 +269,7 @@ class _ReportsPageState extends State<ReportsPage> {
                         ),
                       ],
                     )
-                  : _buildChart(categoryTotals, expenseTxForChart, colors, totalExpense),
+                  : _buildChart(categoryTotals, expenseTxForChart, colors, totalExpense, state),
             ),
             const SizedBox(height: 24),
             Container(
@@ -284,7 +309,7 @@ class _ReportsPageState extends State<ReportsPage> {
     ));
   }
 
-  Widget _buildChart(Map<String, double> categoryTotals, List<TransactionModel> expenseTx, List<Color> colors, double totalExpense) {
+  Widget _buildChart(Map<String, double> categoryTotals, List<TransactionModel> expenseTx, List<Color> colors, double totalExpense, TransactionLoaded state) {
     if (_selectedChart == ChartType.pie) {
       final List<PieChartSectionData> pieSections = [];
       int colorIndex = 0;
@@ -417,7 +442,16 @@ class _ReportsPageState extends State<ReportsPage> {
       int maxDay = 0;
       
       for (var tx in expenseTx) {
-        String rawCatName = tx.category?.name ?? 'Lainnya';
+        String rawCatName = tx.category?.name ?? '';
+        if (rawCatName.isEmpty) {
+          try {
+            final cat = state.categories.firstWhere((c) => c.id?.toLowerCase() == tx.categoryId.toLowerCase());
+            rawCatName = cat.name;
+          } catch (_) {
+            rawCatName = 'Lainnya';
+          }
+        }
+        
         if (!categoryTotals.containsKey(rawCatName)) {
           rawCatName = 'Lainnya';
         }
@@ -560,7 +594,7 @@ class _ReportsPageState extends State<ReportsPage> {
               );
             },
             onDismissed: (direction) {
-              context.read<TransactionBloc>().add(DeleteTransaction(tx.id));
+              context.read<TransactionBloc>().add(DeleteTransaction(tx.id!));
               ToastHelper.showSuccess(context, 'Transaksi berhasil dihapus');
             },
             child: ListTile(
@@ -601,11 +635,9 @@ class _ReportsPageState extends State<ReportsPage> {
       categories = state.categories;
     }
 
-    showModalBottomSheet(
+    PopupHelper.showAdaptivePopup(
       context: context,
-      useRootNavigator: true,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
@@ -613,7 +645,10 @@ class _ReportsPageState extends State<ReportsPage> {
             final isDark = theme.brightness == Brightness.dark;
             
             Widget content = Container(
-              padding: const EdgeInsets.all(24),
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+                left: 24, right: 24, top: 24,
+              ),
               decoration: BoxDecoration(
                 color: isDark ? Colors.black.withValues(alpha: 0.4) : theme.scaffoldBackgroundColor,
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
@@ -816,14 +851,17 @@ class _ReportsPageState extends State<ReportsPage> {
       );
     }
 
-    return Row(
-      children: [
-        buildMiniCard("Pengeluaran", "Rp ${_formatMoney(totalExpense)}", Icons.shopping_bag_outlined, Colors.orange),
-        const SizedBox(width: 8),
-        buildMiniCard("Rata-rata", "Rp ${_formatMoney(avgDaily)}/hr", Icons.show_chart, Colors.blue),
-        const SizedBox(width: 8),
-        buildMiniCard("Sisa Uang", estimatedDaysLeft > 100 ? "> 3 bln" : "$estimatedDaysLeft Hari", Icons.account_balance_wallet_outlined, Colors.teal, trendText: isDanger ? "Bahaya" : "Aman"),
-      ],
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          buildMiniCard("Pengeluaran", "Rp ${_formatMoney(totalExpense)}", Icons.shopping_bag_outlined, Colors.orange),
+          const SizedBox(width: 8),
+          buildMiniCard("Rata-rata", "Rp ${_formatMoney(avgDaily)}/hr", Icons.show_chart, Colors.blue),
+          const SizedBox(width: 8),
+          buildMiniCard("Sisa Uang", estimatedDaysLeft > 100 ? "> 3 bln" : "$estimatedDaysLeft Hari", Icons.account_balance_wallet_outlined, Colors.teal, trendText: isDanger ? "Bahaya" : "Aman"),
+        ],
+      ),
     );
   }
 }

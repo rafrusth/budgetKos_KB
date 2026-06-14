@@ -1,6 +1,6 @@
 import 'package:fl_chart/fl_chart.dart';
-import '../../data/models/transaction_model.dart';
-import '../../data/models/category_model.dart';
+import 'package:budget_kos/shared/models/transaction_model.dart';
+import 'package:budget_kos/shared/models/category_model.dart';
 import 'transaction_event.dart';
 
 abstract class TransactionState {}

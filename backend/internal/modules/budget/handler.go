@@ -2,8 +2,6 @@ package budget
 
 import (
 	"net/http"
-	"strconv"
-
 	"budget_kos/backend/pkg/response"
 	"github.com/gin-gonic/gin"
 )
@@ -17,7 +15,8 @@ func NewHandler(service Service) *Handler {
 }
 
 func (h *Handler) GetAll(c *gin.Context) {
-	budgets, err := h.service.GetAll()
+	userID := c.GetString("user_id")
+	budgets, err := h.service.GetAll(userID)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, "Failed to get budgets")
 		return
@@ -26,12 +25,13 @@ func (h *Handler) GetAll(c *gin.Context) {
 }
 
 func (h *Handler) Create(c *gin.Context) {
+	userID := c.GetString("user_id")
 	var req Budget
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, http.StatusBadRequest, "Invalid request")
 		return
 	}
-	budget, err := h.service.Create(req)
+	budget, err := h.service.Create(userID, req)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, "Failed to create budget")
 		return
@@ -40,8 +40,8 @@ func (h *Handler) Create(c *gin.Context) {
 }
 
 func (h *Handler) Update(c *gin.Context) {
+	userID := c.GetString("user_id")
 	idStr := c.Param("id")
-	id, _ := strconv.Atoi(idStr)
 
 	var req Budget
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -49,7 +49,7 @@ func (h *Handler) Update(c *gin.Context) {
 		return
 	}
 
-	budget, err := h.service.Update(uint(id), req)
+	budget, err := h.service.Update(userID, idStr, req)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, "Failed to update budget")
 		return
@@ -58,10 +58,10 @@ func (h *Handler) Update(c *gin.Context) {
 }
 
 func (h *Handler) Delete(c *gin.Context) {
+	userID := c.GetString("user_id")
 	idStr := c.Param("id")
-	id, _ := strconv.Atoi(idStr)
 
-	if err := h.service.Delete(uint(id)); err != nil {
+	if err := h.service.Delete(userID, idStr); err != nil {
 		response.Error(c, http.StatusInternalServerError, "Failed to delete budget")
 		return
 	}

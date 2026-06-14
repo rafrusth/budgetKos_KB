@@ -1,16 +1,26 @@
 import 'dart:ui';
-import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'dart:io' as import_io;
+import 'package:window_manager/window_manager.dart';
+import '../../../../core/widgets/custom_title_bar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/utils/toast_helper.dart';
+import '../../../../core/utils/profile_notifier.dart';
+import '../../../../core/utils/popup_helper.dart';
 import '../../../../core/database/sqlite_helper.dart';
 import '../../../../core/theme/theme_cubit.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/sync/sync_engine.dart';
+import '../../../auth/presentation/bloc/auth_bloc.dart';
+import '../../../auth/presentation/bloc/auth_event.dart';
 import 'security_page.dart';
 import 'notifications_settings_page.dart';
 import 'help_support_page.dart';
 import '../../../categories/presentation/pages/categories_page.dart';
+
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -51,28 +61,26 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   void _editProfileDialog() {
-    final nameController = TextEditingController(text: _userName);
-    final emailController = TextEditingController(text: _userEmail);
-    final locationController = TextEditingController(text: _campusLocation);
+    final nameController = TextEditingController(text: profileNotifier.value.name);
+    final emailController = TextEditingController(text: profileNotifier.value.email);
+    final locationController = TextEditingController(text: profileNotifier.value.campus);
+    final passwordController = TextEditingController(text: profileNotifier.value.password);
     final theme = Theme.of(context);
-    showModalBottomSheet(
+    PopupHelper.showAdaptivePopup(
       context: context,
-      useRootNavigator: true,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (ctx) {
-        return AnimatedPadding(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: theme.scaffoldBackgroundColor,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-            ),
-            child: SingleChildScrollView(
-              child: Column(
+        return Container(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+            left: 24, right: 24, top: 24,
+          ),
+          decoration: BoxDecoration(
+            color: theme.scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -103,6 +111,17 @@ class _ProfilePageState extends State<ProfilePage> {
                     controller: emailController,
                     decoration: InputDecoration(
                       labelText: 'Email',
+                      filled: true,
+                      fillColor: theme.cardColor,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: passwordController,
+                    obscureText: true,
+                    decoration: InputDecoration(
+                      labelText: 'Password',
                       filled: true,
                       fillColor: theme.cardColor,
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
@@ -155,10 +174,12 @@ class _ProfilePageState extends State<ProfilePage> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       ),
                       onPressed: () async {
-                        final prefs = await SharedPreferences.getInstance();
-                        await prefs.setString('user_name', nameController.text);
-                        await prefs.setString('user_email', emailController.text);
-                        await prefs.setString('user_campus_location', locationController.text);
+                        await profileNotifier.updateProfile(
+                          nameController.text,
+                          emailController.text,
+                          locationController.text,
+                          passwordController.text,
+                        );
                         setState(() {
                           _userName = nameController.text;
                           _userEmail = emailController.text;
@@ -173,9 +194,124 @@ class _ProfilePageState extends State<ProfilePage> {
                 ],
               ),
             ),
-          ),
-        );
+          );
       },
+    );
+  }
+
+  Widget _buildProfileHeader(BuildContext context, ThemeData theme, bool isDark) {
+    final isDesktop = MediaQuery.of(context).size.width > 800;
+    
+    if (!isDesktop) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.green.withValues(alpha: 0.15),
+            ),
+            child: CircleAvatar(
+              radius: 40,
+              backgroundColor: Colors.transparent,
+              child: Icon(Icons.person, size: 48, color: theme.colorScheme.primary),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(_userName, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          Text(_userEmail, style: const TextStyle(fontSize: 14, color: Colors.grey)),
+          if (_campusLocation.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.location_on, size: 12, color: theme.colorScheme.primary),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    _campusLocation,
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.primary),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: _editProfileDialog,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isDark ? Colors.white24 : Colors.black12,
+              foregroundColor: isDark ? Colors.white : Colors.black,
+              shape: const StadiumBorder(),
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+            ),
+            child: const Text('Edit profile', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+          ),
+        ],
+      );
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.green.withValues(alpha: 0.15),
+          ),
+          child: CircleAvatar(
+            radius: 40,
+            backgroundColor: Colors.transparent,
+            child: Icon(Icons.person, size: 48, color: theme.colorScheme.primary),
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(_userName, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              Text(_userEmail, style: const TextStyle(fontSize: 14, color: Colors.grey)),
+              if (_campusLocation.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(Icons.location_on, size: 12, color: theme.colorScheme.primary),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        _campusLocation,
+                        style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.primary),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(width: 16),
+        ElevatedButton(
+          onPressed: _editProfileDialog,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: isDark ? Colors.white : Colors.black,
+            foregroundColor: isDark ? Colors.black : Colors.white,
+            shape: const StadiumBorder(),
+            elevation: 0,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          ),
+          child: const Text('Edit profile', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+        ),
+      ],
     );
   }
 
@@ -186,6 +322,17 @@ class _ProfilePageState extends State<ProfilePage> {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: const Text('Profil', style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          WindowButtonsRow(),
+        ],
+        flexibleSpace: import_io.Platform.isWindows || import_io.Platform.isLinux || import_io.Platform.isMacOS
+            ? DragToMoveArea(child: Container(color: Colors.transparent))
+            : null,
+      ),
       body: RefreshIndicator(
         onRefresh: () async {
           await _loadProfile();
@@ -197,51 +344,7 @@ class _ProfilePageState extends State<ProfilePage> {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 // Header (Avatar, Name, Email, Edit Button)
-                Center(
-                  child: Column(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.green.withValues(alpha: 0.15),
-                        ),
-                        child: CircleAvatar(
-                          radius: 50,
-                          backgroundColor: Colors.transparent,
-                          child: Icon(Icons.person, size: 56, color: theme.colorScheme.primary), // Or an image if available
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(_userName, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 4),
-                      Text(_userEmail, style: const TextStyle(fontSize: 14, color: Colors.grey)),
-                      if (_campusLocation.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.location_on, size: 12, color: theme.colorScheme.primary),
-                            const SizedBox(width: 4),
-                            Text(_campusLocation, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.primary)),
-                          ],
-                        ),
-                      ],
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: _editProfileDialog,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: isDark ? Colors.white : Colors.black,
-                          foregroundColor: isDark ? Colors.black : Colors.white,
-                          shape: const StadiumBorder(),
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                        ),
-                        child: const Text('Edit profile', style: TextStyle(fontWeight: FontWeight.bold)),
-                      ),
-                    ],
-                  ),
-                ),
+                _buildProfileHeader(context, theme, isDark),
                 const SizedBox(height: 48),
                 
                 // Account / Inventories Section
@@ -251,13 +354,13 @@ class _ProfilePageState extends State<ProfilePage> {
                   isDark: isDark,
                   children: [
                     _buildListTile(theme, icon: CupertinoIcons.tag, title: 'Kelola Kategori', isDark: isDark, onTap: () {
-                      Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const CategoriesPage()));
+                      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CategoriesPage()));
                     }),
                     _buildListTile(theme, icon: CupertinoIcons.lock, title: 'Keamanan', isDark: isDark, onTap: () {
-                      Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const SecurityPage()));
+                      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SecurityPage()));
                     }),
                     _buildListTile(theme, icon: CupertinoIcons.question_circle, title: 'Support', isDark: isDark, onTap: () {
-                      Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const HelpSupportPage()));
+                      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const HelpSupportPage()));
                     }),
                   ]
                 ),
@@ -269,6 +372,24 @@ class _ProfilePageState extends State<ProfilePage> {
                   title: 'Preferences',
                   isDark: isDark,
                   children: [
+                    _buildListTile(theme, icon: CupertinoIcons.cloud_upload, title: 'Push (Save) Data', isDark: isDark, onTap: () async {
+                      try {
+                        ToastHelper.showSuccess(context, 'Memulai Push data...');
+                        await getIt<SyncEngine>().pushData();
+                        if (context.mounted) ToastHelper.showSuccess(context, 'Push data berhasil!');
+                      } catch (e) {
+                        if (context.mounted) ToastHelper.showError(context, 'Gagal Push data: $e');
+                      }
+                    }),
+                    _buildListTile(theme, icon: CupertinoIcons.cloud_download, title: 'Pull (Load) Data', isDark: isDark, onTap: () async {
+                      try {
+                        ToastHelper.showSuccess(context, 'Memulai Pull data...');
+                        await getIt<SyncEngine>().pullData();
+                        if (context.mounted) ToastHelper.showSuccess(context, 'Pull data berhasil!');
+                      } catch (e) {
+                        if (context.mounted) ToastHelper.showError(context, 'Gagal Pull data: $e');
+                      }
+                    }),
                     BlocBuilder<ThemeCubit, ThemeMode>(
                       builder: (context, themeMode) {
                         String themeText = 'System';
@@ -293,10 +414,11 @@ class _ProfilePageState extends State<ProfilePage> {
                       }
                     ),
                     _buildListTile(theme, icon: CupertinoIcons.bell, title: 'Notifikasi', isDark: isDark, onTap: () {
-                      Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const NotificationsSettingsPage()));
+                      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NotificationsSettingsPage()));
                     }),
                     _buildListTile(theme, icon: CupertinoIcons.square_arrow_right, title: 'Logout', textColor: Colors.red, iconColor: Colors.red, isDark: isDark, trailing: const SizedBox.shrink(), onTap: () {
-                      // Handle Logout if implemented
+                      context.read<AuthBloc>().add(LogoutRequested());
+                      context.go('/login');
                     }),
                   ]
                 ),
@@ -341,11 +463,9 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   void _showThemeSelectionDialog(BuildContext context, ThemeMode currentMode) {
-    showModalBottomSheet(
+    PopupHelper.showAdaptivePopup(
       context: context,
-      useRootNavigator: true,
-      backgroundColor: Colors.transparent,
-      elevation: 0,
+      isScrollControlled: false,
       builder: (ctx) {
         final theme = Theme.of(context);
         final isDark = theme.brightness == Brightness.dark;

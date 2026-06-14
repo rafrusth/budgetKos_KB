@@ -1,6 +1,13 @@
+import 'dart:convert';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter/services.dart';
+import 'dart:io' as import_io;
+import 'package:window_manager/window_manager.dart';
+import '../../../../core/widgets/custom_title_bar.dart';
+import '../../../../core/utils/popup_helper.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/di/injection.dart';
@@ -12,9 +19,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../transaction/presentation/bloc/transaction_bloc.dart';
 import '../../../transaction/presentation/bloc/transaction_event.dart';
 import '../../../transactions/data/datasources/transaction_local_ds.dart';
-import '../../../../shared/models/transaction_model.dart';
+import 'package:budget_kos/shared/models/transaction_model.dart';
 import '../../../categories/data/datasources/category_local_ds.dart';
-import '../../../../shared/models/category_model.dart';
+import 'package:budget_kos/shared/models/category_model.dart';
+import '../../../../core/sync/sync_engine.dart';
+
 class AIChatPage extends StatefulWidget {
   const AIChatPage({super.key});
 
@@ -37,6 +46,22 @@ class _AIChatPageState extends State<AIChatPage> {
   List<AiChatModel> _chatHistory = [];
   bool _isLoading = false;
   bool _isOffline = false;
+
+  String _formatMoney(double amount) {
+    if (amount >= 1000) {
+      String formatted = amount.toStringAsFixed(0);
+      return formatted.replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.');
+    }
+    return amount.toStringAsFixed(0);
+  }
+
+  String _getMonthName(int month) {
+    const months = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+    return months[month - 1];
+  }
 
   /// Jumlah exchange (prompt+response) terakhir yang dikirim ke Gemini.
   /// Menghemat token: hanya 5 percakapan terakhir, bukan seluruh riwayat.
@@ -148,7 +173,7 @@ class _AIChatPageState extends State<AIChatPage> {
       );
 
       if (response.statusCode == 200) {
-        final reply = response.data['data']['reply'] as String;
+        String finalReply = response.data['data']['reply'] as String;
         final createdTxs = response.data['data']['created_transactions'] as List?;
         final createdCats = response.data['data']['created_categories'] as List?;
         final updatedCats = response.data['data']['updated_categories'] as List?;
@@ -158,19 +183,30 @@ class _AIChatPageState extends State<AIChatPage> {
 
         if (createdTxs != null && createdTxs.isNotEmpty) {
           requiresRefresh = true;
+          finalReply += "\n\nTransaksi sudah ditambahkan dengan detail:";
           for (var txData in createdTxs) {
             final model = TransactionModel(
-              id: txData['id'],
+              id: txData['id']?.toString(),
               title: txData['title'] ?? '',
               amount: (txData['amount'] as num).toDouble(),
               type: txData['type'] ?? 'expense',
-              categoryId: txData['category_id'] ?? 1,
+              categoryId: (txData['category_id'] ?? 1).toString(),
               date: txData['date'] != null ? DateTime.parse(txData['date']) : DateTime.now(),
               createdAt: DateTime.now(),
               updatedAt: DateTime.now(),
-              isSynced: true,
+              syncStatus: 0,
             );
             await getIt<TransactionLocalDataSource>().insertTransaction(model);
+            
+            final typeStr = model.type == 'expense' ? 'Pengeluaran' : 'Pemasukan';
+            final dateStr = "${model.date.day} ${_getMonthName(model.date.month)} ${model.date.year}";
+            
+            finalReply += "\n==== $typeStr ====\n";
+            finalReply += "- Nominal      : Rp ${_formatMoney(model.amount)}\n";
+            finalReply += "- Kategori     : ${model.categoryId}\n";
+            finalReply += "- Tanggal      : $dateStr\n";
+            finalReply += "- Keterangan   : ${model.title}\n";
+            finalReply += "=================";
           }
         }
 
@@ -178,7 +214,7 @@ class _AIChatPageState extends State<AIChatPage> {
           requiresRefresh = true;
           for (var catData in createdCats) {
             final model = CategoryModel(
-              id: catData['id'] ?? 0,
+              id: catData['id']?.toString() ?? catData['name']?.toString() ?? '',
               name: catData['name'] ?? '',
               type: catData['type'] ?? 'expense',
               icon: catData['icon'] ?? '',
@@ -192,7 +228,7 @@ class _AIChatPageState extends State<AIChatPage> {
           requiresRefresh = true;
           for (var catData in updatedCats) {
             final model = CategoryModel(
-              id: catData['id'] ?? 0,
+              id: catData['id']?.toString() ?? '',
               name: catData['name'] ?? '',
               type: catData['type'] ?? 'expense',
               icon: catData['icon'] ?? '',
@@ -205,20 +241,26 @@ class _AIChatPageState extends State<AIChatPage> {
         if (deletedCats != null && deletedCats.isNotEmpty) {
           requiresRefresh = true;
           for (var id in deletedCats) {
-            if (id is num) {
-              await getIt<CategoryLocalDataSource>().deleteCategory(id.toInt());
-            }
+            await getIt<CategoryLocalDataSource>().deleteCategory(id.toString());
           }
         }
 
         if (requiresRefresh && mounted) {
-          context.read<TransactionBloc>().add(FetchTransactions());
+          ToastHelper.showSuccess(context, 'Transaksi berhasil diproses');
+          // Sync with backend to get any categories auto-created in the server by the AI service
+          await getIt<SyncEngine>().syncData();
+          if (mounted) {
+            context.read<TransactionBloc>().add(FetchTransactions());
+            if (createdTxs != null && createdTxs.isNotEmpty) {
+              ToastHelper.showSuccess(context, 'Berhasil memasukkan transaksi dari AI');
+            }
+          }
         }
 
-        final newChat = AiChatModel(prompt: text, response: reply, timestamp: DateTime.now());
+        final newChat = AiChatModel(prompt: text, response: finalReply, timestamp: DateTime.now());
         await getIt<AiChatLocalDataSource>().insertChat(newChat);
         setState(() {
-          _messages.add(_Message(reply, false));
+          _messages.add(_Message(finalReply, false));
           _chatHistory.add(newChat);
         });
         _scrollToBottom();
@@ -244,14 +286,24 @@ class _AIChatPageState extends State<AIChatPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
     return Scaffold(
       appBar: AppBar(
-        title: Text('Bud-AI', style: TextStyle(fontWeight: FontWeight.bold, color: theme.brightness == Brightness.dark ? Colors.white : Colors.black)),
+        title: const Text('Konsultan Keuangan', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        iconTheme: IconThemeData(color: theme.brightness == Brightness.dark ? Colors.white : Colors.black),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.history),
+            tooltip: 'Riwayat Obrolan',
+            onPressed: () => _showHistorySheet(context, theme),
+          ),
+          const WindowButtonsRow(),
+        ],
+        flexibleSpace: import_io.Platform.isWindows || import_io.Platform.isLinux || import_io.Platform.isMacOS
+            ? DragToMoveArea(child: Container(color: Colors.transparent))
+            : null,
       ),
-      drawer: _buildDrawer(theme),
       body: _isOffline 
         ? _buildOfflineUI(theme)
         : Column(
@@ -352,63 +404,92 @@ class _AIChatPageState extends State<AIChatPage> {
     );
   }
 
-  Widget _buildDrawer(ThemeData theme) {
-    return Drawer(
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.only(top: 60, bottom: 20, left: 20, right: 20),
-            width: double.infinity,
-            color: theme.colorScheme.primary.withValues(alpha: 0.1),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(Icons.history, size: 40, color: Colors.blue),
-                const SizedBox(height: 12),
-                Text("Riwayat Obrolan", style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-              ],
+  void _showHistorySheet(BuildContext context, ThemeData theme) {
+    PopupHelper.showAdaptivePopup(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.7,
+          minChildSize: 0.4,
+          maxChildSize: 0.9,
+          builder: (context, scrollController) {
+            return ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: theme.scaffoldBackgroundColor.withValues(alpha: 0.8),
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                  ),
+              child: Column(
+                children: [
+                  Container(
+                    margin: const EdgeInsets.only(top: 12),
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.history, size: 28, color: Colors.blue),
+                        const SizedBox(width: 12),
+                        Text("Riwayat Obrolan", style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                        const Spacer(),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline, color: Colors.red),
+                          tooltip: 'Hapus Semua Riwayat',
+                          onPressed: () async {
+                            await getIt<AiChatLocalDataSource>().clearHistory();
+                            _loadHistory();
+                            if (mounted) {
+                              Navigator.pop(sheetContext);
+                              ToastHelper.showSuccess(context, 'Histori obrolan dihapus');
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: _chatHistory.isEmpty
+                      ? const Center(child: Text("Belum ada riwayat", style: TextStyle(color: Colors.grey)))
+                      : ListView.builder(
+                          controller: scrollController,
+                          padding: EdgeInsets.zero,
+                          itemCount: _chatHistory.length,
+                          itemBuilder: (context, index) {
+                            final chat = _chatHistory[index];
+                            return ListTile(
+                              leading: const Icon(Icons.chat_bubble_outline, size: 20),
+                              title: Text(
+                                chat.prompt,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 14),
+                              ),
+                              onTap: () {
+                                Navigator.pop(sheetContext);
+                              },
+                            );
+                          },
+                        ),
+                  ),
+                ],
+              ),
             ),
           ),
-          Expanded(
-            child: _chatHistory.isEmpty 
-              ? const Center(child: Text("Belum ada riwayat", style: TextStyle(color: Colors.grey)))
-              : ListView.builder(
-                  padding: EdgeInsets.zero,
-                  itemCount: _chatHistory.length,
-                  itemBuilder: (context, index) {
-                    final chat = _chatHistory[index];
-                    return ListTile(
-                      leading: const Icon(Icons.chat_bubble_outline, size: 20),
-                      title: Text(
-                        chat.prompt, 
-                        maxLines: 1, 
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                      onTap: () {
-                        Navigator.pop(context); // Close drawer
-                        // We could scroll to index, but a simple close is fine for now
-                      },
-                    );
-                  },
-                ),
-          ),
-          const Divider(height: 1),
-          ListTile(
-            leading: const Icon(Icons.delete_outline, color: Colors.red),
-            title: const Text("Hapus Semua Riwayat", style: TextStyle(color: Colors.red)),
-            onTap: () async {
-              await getIt<AiChatLocalDataSource>().clearHistory();
-              _loadHistory();
-              if (mounted) {
-                Navigator.pop(context);
-                ToastHelper.showSuccess(context, 'Histori obrolan dihapus');
-              }
-            },
-          ),
-          SizedBox(height: MediaQuery.of(context).size.height * 0.02 + 100),
-        ],
-      ),
+        );
+      },
+    );
+      },
     );
   }
 
@@ -492,7 +573,8 @@ class _AIChatPageState extends State<AIChatPage> {
 
   Widget _buildInputArea(ThemeData theme) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-    final extraPadding = bottomInset > 0 ? 0.0 : 100.0 + (MediaQuery.of(context).size.height * 0.03); // 100px to avoid navbar
+    final isDesktop = MediaQuery.of(context).size.width > 800;
+    final extraPadding = (bottomInset > 0 || isDesktop) ? 0.0 : 100.0 + (MediaQuery.of(context).size.height * 0.03); // 100px to avoid navbar on mobile
     
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12).copyWith(
