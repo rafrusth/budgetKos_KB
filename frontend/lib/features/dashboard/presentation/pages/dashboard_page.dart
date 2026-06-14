@@ -316,7 +316,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                   const SizedBox(height: 24),
                                   _buildSectionTitle(theme, 'Quick Stats', ''),
                                   const SizedBox(height: 16),
-                                  _buildQuickStatsCards(context, theme, state, isDesktop: true),
+                                  Expanded(child: _buildQuickStatsCards(context, theme, state, isDesktop: true, isExpanded: true)),
                                 ],
                               ),
                             ),
@@ -644,7 +644,7 @@ class _DashboardPageState extends State<DashboardPage> {
     return spots;
   }
 
-  Widget _buildQuickStatsCards(BuildContext context, ThemeData theme, TransactionLoaded state, {bool isDesktop = false}) {
+  Widget _buildQuickStatsCards(BuildContext context, ThemeData theme, TransactionLoaded state, {bool isDesktop = false, bool isExpanded = false}) {
     double incomeProgress = (_incomeTarget > 0 ? state.totalIncome / _incomeTarget : 0.0).clamp(0.0, 1.0);
     double expenseProgress = (_monthlyBudget > 0 ? state.totalExpense / _monthlyBudget : 0.0).clamp(0.0, 1.0);
 
@@ -663,13 +663,14 @@ class _DashboardPageState extends State<DashboardPage> {
     }
 
     return Row(
+      crossAxisAlignment: isExpanded ? CrossAxisAlignment.stretch : CrossAxisAlignment.center,
       children: [
         Expanded(
-          child: _statCard(theme, 'Pemasukan', 'Rp ${_formatMoney(state.totalIncome)}', theme.colorScheme.primary, incomeProgress, onTap: _showEditIncomeDialog, isDesktop: isDesktop),
+          child: _statCard(theme, 'Pemasukan', 'Rp ${_formatMoney(state.totalIncome)}', theme.colorScheme.primary, incomeProgress, onTap: _showEditIncomeDialog, isDesktop: isDesktop, isExpanded: isExpanded),
         ),
         const SizedBox(width: 16),
         Expanded(
-          child: _statCard(theme, 'Pengeluaran', 'Rp ${_formatMoney(state.totalExpense)}', theme.colorScheme.secondary, expenseProgress, onTap: () => _showSetBudgetDialog(context), isDesktop: isDesktop),
+          child: _statCard(theme, 'Pengeluaran', 'Rp ${_formatMoney(state.totalExpense)}', theme.colorScheme.secondary, expenseProgress, onTap: () => _showSetBudgetDialog(context), isDesktop: isDesktop, isExpanded: isExpanded),
         ),
       ],
     );
@@ -856,7 +857,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 lineBarsData: [
                   LineChartBarData(
                     spots: chartData,
-                    isCurved: true,
+                    isCurved: chartData.length > 5,
                     color: _getChartColor(theme, type),
                     barWidth: 4,
                     isStrokeCapRound: true,
@@ -884,7 +885,7 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  Widget _statCard(ThemeData theme, String title, String amount, Color color, double progress, {VoidCallback? onTap, bool isDesktop = true}) {
+  Widget _statCard(ThemeData theme, String title, String amount, Color color, double progress, {VoidCallback? onTap, bool isDesktop = true, bool isExpanded = false}) {
     final isDark = theme.brightness == Brightness.dark;
     
     Widget card = Container(
@@ -932,7 +933,7 @@ class _DashboardPageState extends State<DashboardPage> {
           Text(title, style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey, fontWeight: FontWeight.w500)),
           const SizedBox(height: 8),
           Text(amount, style: theme.textTheme.titleMedium?.copyWith(color: theme.textTheme.bodyLarge?.color, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 16),
+          if (isExpanded) const Spacer() else const SizedBox(height: 16),
           // Progress text on top
           Align(
             alignment: Alignment.centerRight,

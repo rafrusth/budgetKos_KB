@@ -103,7 +103,7 @@ class SyncEngine {
         }
       });
     } else {
-      throw Exception('Push failed with status ${response.statusCode}');
+      throw Exception('Push failed with status ${response.statusCode}, body: ${response.body}');
     }
   }
 

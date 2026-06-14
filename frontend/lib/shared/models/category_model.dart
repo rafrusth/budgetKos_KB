@@ -68,8 +68,8 @@ class CategoryModel {
       'sort_order': sortOrder,
       'sync_status': syncStatus,
       'is_deleted': isDeleted,
-      if (updatedAt != null) 'updated_at': updatedAt,
-      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt!.endsWith('Z') ? updatedAt : '${updatedAt}Z',
+      if (createdAt != null) 'created_at': createdAt!.endsWith('Z') ? createdAt : '${createdAt}Z',
     };
   }
 }

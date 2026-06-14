@@ -2,8 +2,51 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
-class WindowButtonsRow extends StatelessWidget {
+class WindowButtonsRow extends StatefulWidget {
   const WindowButtonsRow({super.key});
+
+  @override
+  State<WindowButtonsRow> createState() => _WindowButtonsRowState();
+}
+
+class _WindowButtonsRowState extends State<WindowButtonsRow> with WindowListener {
+  bool _isMaximized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    windowManager.addListener(this);
+    _init();
+  }
+
+  void _init() async {
+    bool isMaximized = await windowManager.isMaximized();
+    if (mounted) {
+      setState(() {
+        _isMaximized = isMaximized;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    windowManager.removeListener(this);
+    super.dispose();
+  }
+
+  @override
+  void onWindowMaximize() {
+    setState(() {
+      _isMaximized = true;
+    });
+  }
+
+  @override
+  void onWindowUnmaximize() {
+    setState(() {
+      _isMaximized = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -18,21 +61,15 @@ class WindowButtonsRow extends StatelessWidget {
           icon: Icons.minimize,
           onPressed: () async => await windowManager.minimize(),
         ),
-        FutureBuilder<bool>(
-          future: windowManager.isMaximized(),
-          builder: (context, snapshot) {
-            final isMaximized = snapshot.data ?? false;
-            return _WindowButton(
-              icon: isMaximized ? Icons.filter_none : Icons.crop_square,
-              iconSize: 14,
-              onPressed: () async {
-                if (isMaximized) {
-                  await windowManager.unmaximize();
-                } else {
-                  await windowManager.maximize();
-                }
-              },
-            );
+        _WindowButton(
+          icon: _isMaximized ? Icons.filter_none : Icons.crop_square,
+          iconSize: 14,
+          onPressed: () async {
+            if (await windowManager.isMaximized()) {
+              await windowManager.unmaximize();
+            } else {
+              await windowManager.maximize();
+            }
           },
         ),
         _WindowButton(

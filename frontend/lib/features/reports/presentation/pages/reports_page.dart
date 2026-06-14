@@ -816,7 +816,8 @@ class _ReportsPageState extends State<ReportsPage> {
     Widget buildMiniCard(String title, String value, IconData icon, Color color, {String? trendText}) {
       return Expanded(
         child: Container(
-          padding: const EdgeInsets.all(12),
+          height: 94,
+          padding: const EdgeInsets.only(left: 12, top: 12, right: 12, bottom: 8),
           decoration: BoxDecoration(
             color: theme.cardColor,
             borderRadius: BorderRadius.circular(16),
@@ -827,6 +828,7 @@ class _ReportsPageState extends State<ReportsPage> {
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -839,29 +841,34 @@ class _ReportsPageState extends State<ReportsPage> {
                   )
                 ],
               ),
-              const SizedBox(height: 8),
-              Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-              if (trendText != null) ...[
-                const SizedBox(height: 4),
-                Text(trendText, style: TextStyle(fontSize: 10, color: trendText.contains('Bahaya') || trendText.contains('Hari') && isDanger ? Colors.red : Colors.green, fontWeight: FontWeight.w600)),
-              ]
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+                  ),
+                  if (trendText != null)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4),
+                      child: Text(trendText, style: TextStyle(fontSize: 14, color: trendText.contains('Bahaya') || trendText.contains('Hari') && isDanger ? Colors.red : Colors.green, fontWeight: FontWeight.w600)),
+                    ),
+                ],
+              ),
             ],
           ),
         ),
       );
     }
 
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          buildMiniCard("Pengeluaran", "Rp ${_formatMoney(totalExpense)}", Icons.shopping_bag_outlined, Colors.orange),
-          const SizedBox(width: 8),
-          buildMiniCard("Rata-rata", "Rp ${_formatMoney(avgDaily)}/hr", Icons.show_chart, Colors.blue),
-          const SizedBox(width: 8),
-          buildMiniCard("Sisa Uang", estimatedDaysLeft > 100 ? "> 3 bln" : "$estimatedDaysLeft Hari", Icons.account_balance_wallet_outlined, Colors.teal, trendText: isDanger ? "Bahaya" : "Aman"),
-        ],
-      ),
+    return Row(
+      children: [
+        buildMiniCard("Pengeluaran", "Rp ${_formatMoney(totalExpense)}", Icons.shopping_bag_outlined, Colors.orange),
+        const SizedBox(width: 8),
+        buildMiniCard("Rata-rata", "Rp ${_formatMoney(avgDaily)}/hr", Icons.show_chart, Colors.blue),
+        const SizedBox(width: 8),
+        buildMiniCard("Sisa Uang", estimatedDaysLeft > 100 ? "> 3 bln" : "$estimatedDaysLeft Hari", Icons.account_balance_wallet_outlined, Colors.teal, trendText: isDanger ? "Bahaya" : "Aman"),
+      ],
     );
   }
 }

@@ -25,7 +25,7 @@ func (h *Handler) Push(c *gin.Context) {
 
 	var req PushRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, "Invalid request format")
+		response.Error(c, http.StatusBadRequest, "Invalid request format: "+err.Error())
 		return
 	}
 
