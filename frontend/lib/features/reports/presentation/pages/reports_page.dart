@@ -143,25 +143,33 @@ class _ReportsPageState extends State<ReportsPage> {
     // Charts use UNFILTERED data (or globally loaded data)
     final expenseTxForChart = state.transactions.where((tx) => tx.type == 'expense').toList();
     
-    // Group by category for Pie and Bar charts (Only uses Expense data)
+    // Create O(1) lookup map for categories to prevent O(N*M) complexity
+    final catMap = {for (var c in state.categories) c.id!.toLowerCase(): c.name};
+
+    // Group by category for Pie, Bar, and Line charts in ONE single pass O(N)
     Map<String, double> rawCategoryTotals = {};
+    Map<String, Map<int, double>> rawDailyTotals = {};
     double totalExpense = 0;
+    int minDay = 999999999;
+    int maxDay = 0;
+
     for (var tx in expenseTxForChart) {
       String catName = tx.category?.name ?? '';
       if (catName.isEmpty) {
-        try {
-          final cat = state.categories.firstWhere((c) => c.id?.toLowerCase() == tx.categoryId.toLowerCase());
-          catName = cat.name;
-        } catch (_) {
-          if (tx.categoryId.contains('-')) {
-            catName = 'Lainnya';
-          } else {
-            catName = tx.categoryId;
-          }
-        }
+        catName = catMap[tx.categoryId.toLowerCase()] ?? (tx.categoryId.contains('-') ? 'Lainnya' : tx.categoryId);
       }
+      
+      // Totals
       rawCategoryTotals[catName] = (rawCategoryTotals[catName] ?? 0) + tx.amount;
       totalExpense += tx.amount;
+
+      // Daily Totals for Line Chart
+      final dayKey = DateTime(tx.date.year, tx.date.month, tx.date.day).millisecondsSinceEpoch ~/ 86400000;
+      if (dayKey < minDay) minDay = dayKey;
+      if (dayKey > maxDay) maxDay = dayKey;
+
+      rawDailyTotals[catName] ??= {};
+      rawDailyTotals[catName]![dayKey] = (rawDailyTotals[catName]![dayKey] ?? 0) + tx.amount;
     }
 
     // Sort to get top 5
@@ -169,16 +177,32 @@ class _ReportsPageState extends State<ReportsPage> {
     List<String> topCats = sortedCats.take(5).map((e) => e.key).toList();
     
     Map<String, double> categoryTotals = {};
+    Map<String, Map<int, double>> categoryDailyTotals = {};
     double othersTotal = 0;
+
+    for (var cat in topCats) {
+      categoryDailyTotals[cat] = {};
+    }
+    categoryDailyTotals['Lainnya'] = {};
+
     for (var entry in sortedCats) {
       if (topCats.contains(entry.key)) {
         categoryTotals[entry.key] = entry.value;
+        rawDailyTotals[entry.key]?.forEach((day, amt) {
+          categoryDailyTotals[entry.key]![day] = amt;
+        });
       } else {
         othersTotal += entry.value;
+        rawDailyTotals[entry.key]?.forEach((day, amt) {
+          categoryDailyTotals['Lainnya']![day] = (categoryDailyTotals['Lainnya']![day] ?? 0) + amt;
+        });
       }
     }
+
     if (othersTotal > 0) {
       categoryTotals['Lainnya'] = (categoryTotals['Lainnya'] ?? 0) + othersTotal;
+    } else {
+      categoryDailyTotals.remove('Lainnya');
     }
 
     final List<Widget> legendWidgets = [];
@@ -257,7 +281,7 @@ class _ReportsPageState extends State<ReportsPage> {
               child: _selectedChart == ChartType.pie
                   ? Stack(
                       children: [
-                        _buildChart(categoryTotals, expenseTxForChart, colors, totalExpense, state),
+                        _buildChart(categoryTotals, categoryDailyTotals, minDay, maxDay, colors, totalExpense),
                         Center(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
@@ -269,7 +293,7 @@ class _ReportsPageState extends State<ReportsPage> {
                         ),
                       ],
                     )
-                  : _buildChart(categoryTotals, expenseTxForChart, colors, totalExpense, state),
+                  : _buildChart(categoryTotals, categoryDailyTotals, minDay, maxDay, colors, totalExpense),
             ),
             const SizedBox(height: 24),
             Container(
@@ -309,7 +333,7 @@ class _ReportsPageState extends State<ReportsPage> {
     ));
   }
 
-  Widget _buildChart(Map<String, double> categoryTotals, List<TransactionModel> expenseTx, List<Color> colors, double totalExpense, TransactionLoaded state) {
+  Widget _buildChart(Map<String, double> categoryTotals, Map<String, Map<int, double>> categoryDailyTotals, int minDay, int maxDay, List<Color> colors, double totalExpense) {
     if (_selectedChart == ChartType.pie) {
       final List<PieChartSectionData> pieSections = [];
       int colorIndex = 0;
@@ -432,38 +456,7 @@ class _ReportsPageState extends State<ReportsPage> {
     
     else {
       // Line Chart: Multi-Category
-      Map<String, Map<int, double>> categoryDailyTotals = {};
-      
-      for (var cat in categoryTotals.keys) {
-        categoryDailyTotals[cat] = {};
-      }
-      
-      int minDay = 999999999;
-      int maxDay = 0;
-      
-      for (var tx in expenseTx) {
-        String rawCatName = tx.category?.name ?? '';
-        if (rawCatName.isEmpty) {
-          try {
-            final cat = state.categories.firstWhere((c) => c.id?.toLowerCase() == tx.categoryId.toLowerCase());
-            rawCatName = cat.name;
-          } catch (_) {
-            rawCatName = 'Lainnya';
-          }
-        }
-        
-        if (!categoryTotals.containsKey(rawCatName)) {
-          rawCatName = 'Lainnya';
-        }
-        
-        final dayStart = DateTime(tx.date.year, tx.date.month, tx.date.day);
-        final dayKey = dayStart.millisecondsSinceEpoch ~/ 86400000;
-        
-        if (dayKey < minDay) minDay = dayKey;
-        if (dayKey > maxDay) maxDay = dayKey;
-        
-        categoryDailyTotals[rawCatName]![dayKey] = (categoryDailyTotals[rawCatName]![dayKey] ?? 0) + tx.amount;
-      }
+      // Data already grouped in O(N) during _buildContent
       
       // Fill gaps with 0
       for (var cat in categoryDailyTotals.keys) {

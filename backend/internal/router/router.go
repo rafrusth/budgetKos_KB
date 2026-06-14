@@ -1,7 +1,7 @@
 package router
 
 import (
-	"budget_kos/backend/internal/database"
+	"budget_kos/backend/internal"
 	"budget_kos/backend/internal/middleware"
 	"budget_kos/backend/internal/modules/ai"
 	"budget_kos/backend/internal/modules/auth"
@@ -12,7 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func SetupRouter() *gin.Engine {
+func SetupRouter(container *internal.AppContainer) *gin.Engine {
 	r := gin.Default()
 
 	r.Use(middleware.CORSMiddleware())
@@ -24,17 +24,17 @@ func SetupRouter() *gin.Engine {
 		})
 
 		// Public Routes
-		auth.RegisterRoutes(api, database.DB)
+		auth.RegisterRoutes(api, container.AuthHandler)
 
 		// Protected Routes
 		protected := api.Group("/")
 		protected.Use(middleware.JWTAuth())
 		{
-			category.RegisterRoutes(protected, database.DB)
-			transaction.RegisterRoutes(protected, database.DB)
-			budget.RegisterRoutes(protected, database.DB)
-			ai.RegisterRoutes(protected, database.DB)
-			sync.RegisterRoutes(protected, database.DB)
+			category.RegisterRoutes(protected, container.CategoryHandler)
+			transaction.RegisterRoutes(protected, container.TransactionHandler)
+			budget.RegisterRoutes(protected, container.BudgetHandler)
+			ai.RegisterRoutes(protected, container.AIHandler)
+			sync.RegisterRoutes(protected, container.SyncHandler)
 		}
 	}
 

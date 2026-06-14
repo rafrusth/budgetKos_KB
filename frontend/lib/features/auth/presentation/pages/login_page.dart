@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
+import '../../../../core/widgets/custom_title_bar.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -27,7 +28,13 @@ class _LoginPageState extends State<LoginPage> {
     final theme = Theme.of(context);
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(title: Text('Login', style: TextStyle(color: theme.colorScheme.onSurface)), backgroundColor: Colors.transparent, elevation: 0, iconTheme: IconThemeData(color: theme.colorScheme.onSurface)),
+      appBar: AppBar(
+        title: Text('Login', style: TextStyle(color: theme.colorScheme.onSurface)),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        iconTheme: IconThemeData(color: theme.colorScheme.onSurface),
+        actions: const [WindowButtonsRow()],
+      ),
       body: BlocConsumer<AuthBloc, AuthState>(
         listener: (context, state) {
           if (state is AuthAuthenticated) {

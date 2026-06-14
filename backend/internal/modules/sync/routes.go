@@ -2,13 +2,9 @@ package sync
 
 import (
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
-func RegisterRoutes(r *gin.RouterGroup, db *gorm.DB) {
-	service := NewService(db)
-	handler := NewHandler(service)
-
+func RegisterRoutes(r *gin.RouterGroup, handler *Handler) {
 	syncGroup := r.Group("/sync")
 	{
 		syncGroup.POST("/push", handler.Push)

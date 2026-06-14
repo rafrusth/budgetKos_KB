@@ -167,17 +167,18 @@ class _AIChatPageState extends State<AIChatPage> {
         }
       };
 
-      final response = await ApiClient.instance.post(
+      final response = await ApiClient.post(
         '/ai/chat',
-        data: payload,
+        body: payload,
       );
 
       if (response.statusCode == 200) {
-        String finalReply = response.data['data']['reply'] as String;
-        final createdTxs = response.data['data']['created_transactions'] as List?;
-        final createdCats = response.data['data']['created_categories'] as List?;
-        final updatedCats = response.data['data']['updated_categories'] as List?;
-        final deletedCats = response.data['data']['deleted_categories'] as List?;
+        final Map<String, dynamic> responseData = jsonDecode(response.body);
+        String finalReply = responseData['data']['reply'] as String;
+        final createdTxs = responseData['data']['created_transactions'] as List?;
+        final createdCats = responseData['data']['created_categories'] as List?;
+        final updatedCats = responseData['data']['updated_categories'] as List?;
+        final deletedCats = responseData['data']['deleted_categories'] as List?;
         
         bool requiresRefresh = false;
 

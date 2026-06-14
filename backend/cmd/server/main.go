@@ -6,6 +6,7 @@ import (
 	"budget_kos/backend/internal/config"
 	"budget_kos/backend/internal/database"
 	"budget_kos/backend/internal/router"
+	"budget_kos/backend/internal"
 )
 
 func main() {
@@ -16,8 +17,11 @@ func main() {
 	database.ConnectDB()
 	database.MigrateDB()
 
+	// Initialize DI Container
+	container := internal.InitContainer(database.DB)
+
 	// Setup Router
-	r := router.SetupRouter()
+	r := router.SetupRouter(container)
 
 	// Start Server
 	port := config.AppConfig.Port

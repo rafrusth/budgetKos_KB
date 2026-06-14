@@ -3,6 +3,8 @@ package auth
 import (
 	"net/http"
 
+	"budget_kos/backend/pkg/response"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -23,23 +25,20 @@ type RegisterRequest struct {
 func (h *Handler) Register(c *gin.Context) {
 	var req RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	user, err := h.service.Register(req.Name, req.Email, req.Password)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "User registered successfully",
-		"data": map[string]interface{}{
-			"id":    user.ID,
-			"name":  user.Name,
-			"email": user.Email,
-		},
+	response.Success(c, http.StatusOK, "User registered successfully", map[string]interface{}{
+		"id":    user.ID,
+		"name":  user.Name,
+		"email": user.Email,
 	})
 }
 
@@ -51,18 +50,17 @@ type LoginRequest struct {
 func (h *Handler) Login(c *gin.Context) {
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	token, err := h.service.Login(req.Email, req.Password)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		response.Error(c, http.StatusUnauthorized, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Login successful",
-		"token":   token,
+	response.Success(c, http.StatusOK, "Login successful", map[string]string{
+		"token": token,
 	})
 }

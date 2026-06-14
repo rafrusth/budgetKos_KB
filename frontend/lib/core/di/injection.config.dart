@@ -21,10 +21,14 @@ import '../../features/categories/domain/repositories/category_repository.dart'
     as _i4;
 import '../../features/categories/presentation/bloc/category_bloc.dart' as _i10;
 import '../../features/transactions/data/datasources/transaction_local_ds.dart'
-    as _i12;
+    as _i16;
 import '../auth/auth_service.dart' as _i3;
-import '../database/sqlite_helper.dart' as _i6;
-import '../sync/sync_engine.dart' as _i7;
+import '../database/sqlite_helper.dart' as _i7;
+import '../sync/data/datasources/sync_local_data_source.dart' as _i12;
+import '../sync/data/datasources/sync_remote_data_source.dart' as _i6;
+import '../sync/data/repositories/sync_repository_impl.dart' as _i14;
+import '../sync/domain/repositories/sync_repository.dart' as _i13;
+import '../sync/sync_engine.dart' as _i15;
 
 extension GetItInjectableX on _i1.GetIt {
 // initializes the registration of main-scope dependencies inside of GetIt
@@ -40,19 +44,27 @@ extension GetItInjectableX on _i1.GetIt {
     gh.lazySingleton<_i3.AuthService>(() => _i3.AuthService());
     gh.lazySingleton<_i4.CategoryRepository>(
         () => _i5.CategoryRepositoryImpl());
-    gh.lazySingleton<_i6.SqliteHelper>(() => _i6.SqliteHelper());
-    gh.lazySingleton<_i7.SyncEngine>(
-        () => _i7.SyncEngine(gh<_i6.SqliteHelper>()));
+    gh.lazySingleton<_i6.ISyncRemoteDataSource>(
+        () => _i6.SyncRemoteDataSourceImpl());
+    gh.lazySingleton<_i7.SqliteHelper>(() => _i7.SqliteHelper());
     gh.lazySingleton<_i8.AiChatLocalDataSource>(
-        () => _i8.AiChatLocalDataSource(gh<_i6.SqliteHelper>()));
+        () => _i8.AiChatLocalDataSource(gh<_i7.SqliteHelper>()));
     gh.factory<_i9.AuthBloc>(() => _i9.AuthBloc(gh<_i3.AuthService>()));
     gh.factory<_i10.CategoryBloc>(
         () => _i10.CategoryBloc(gh<_i4.CategoryRepository>()));
     gh.lazySingleton<_i11.CategoryLocalDataSource>(
-        () => _i11.CategoryLocalDataSourceImpl(gh<_i6.SqliteHelper>()));
-    gh.lazySingleton<_i12.TransactionLocalDataSource>(
-        () => _i12.TransactionLocalDataSourceImpl(
-              gh<_i6.SqliteHelper>(),
+        () => _i11.CategoryLocalDataSourceImpl(gh<_i7.SqliteHelper>()));
+    gh.lazySingleton<_i12.ISyncLocalDataSource>(
+        () => _i12.SyncLocalDataSourceImpl(gh<_i7.SqliteHelper>()));
+    gh.lazySingleton<_i13.ISyncRepository>(() => _i14.SyncRepositoryImpl(
+          gh<_i12.ISyncLocalDataSource>(),
+          gh<_i6.ISyncRemoteDataSource>(),
+        ));
+    gh.lazySingleton<_i15.SyncEngine>(
+        () => _i15.SyncEngine(gh<_i13.ISyncRepository>()));
+    gh.lazySingleton<_i16.TransactionLocalDataSource>(
+        () => _i16.TransactionLocalDataSourceImpl(
+              gh<_i7.SqliteHelper>(),
               gh<_i11.CategoryLocalDataSource>(),
             ));
     return this;

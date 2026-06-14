@@ -8,7 +8,6 @@ import (
 	"budget_kos/backend/internal/modules/user"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
-	"gorm.io/gorm"
 )
 
 type Service interface {
@@ -17,17 +16,16 @@ type Service interface {
 }
 
 type service struct {
-	db *gorm.DB
+	repo Repository
 }
 
-func NewService(db *gorm.DB) Service {
-	return &service{db}
+func NewService(repo Repository) Service {
+	return &service{repo}
 }
 
 func (s *service) Register(name, email, password string) (*user.User, error) {
 	// Check if email already exists
-	var existingUser user.User
-	if err := s.db.Where("email = ?", email).First(&existingUser).Error; err == nil {
+	if _, err := s.repo.FindByEmail(email); err == nil {
 		return nil, errors.New("email already registered")
 	}
 
@@ -42,7 +40,7 @@ func (s *service) Register(name, email, password string) (*user.User, error) {
 		PasswordHash: string(hashedPassword),
 	}
 
-	if err := s.db.Create(newUser).Error; err != nil {
+	if err := s.repo.Create(newUser); err != nil {
 		return nil, err
 	}
 
@@ -50,18 +48,18 @@ func (s *service) Register(name, email, password string) (*user.User, error) {
 }
 
 func (s *service) Login(email, password string) (string, error) {
-	var user user.User
-	if err := s.db.Where("email = ?", email).First(&user).Error; err != nil {
+	u, err := s.repo.FindByEmail(email)
+	if err != nil {
 		return "", errors.New("invalid email or password")
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
+	if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password)); err != nil {
 		return "", errors.New("invalid email or password")
 	}
 
 	// Generate JWT
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"sub": user.ID,
+		"sub": u.ID,
 		"exp": time.Now().Add(time.Hour * 72).Unix(),
 	})
 

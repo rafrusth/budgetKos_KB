@@ -2,15 +2,11 @@ package category
 
 import (
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
-func RegisterRoutes(api *gin.RouterGroup, db *gorm.DB) {
-	repo := NewRepository(db)
-	service := NewService(repo)
-	handler := NewHandler(service)
+func RegisterRoutes(r *gin.RouterGroup, handler *Handler) {
 
-	routes := api.Group("/categories")
+	routes := r.Group("/categories")
 	{
 		routes.GET("", handler.GetAll)
 		routes.POST("", handler.Create)
